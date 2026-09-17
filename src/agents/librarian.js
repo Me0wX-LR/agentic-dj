@@ -1,12 +1,28 @@
 import { MOODS } from "../constants.js";
 import { logError, logInfo, logWarn } from "../debug/log.js";
 import { catalogInventory, findSound, listCatalog, writeCard } from "../rag/catalog.js";
+import { moodFromTitle } from "../rag/title-mood.js";
 import { hasLlmKey, publicLlmConfig } from "../settings.js";
 import { analyzeSoundFile } from "../tools/audio-analyze.js";
 import { chatJson, extraSystem } from "../tools/llm.js";
 
 export class Librarian {
-  async analyzeAll({ force = false } = {}) {
+  constructor() {
+    this._analyzeLock = null;
+  }
+
+  async analyzeAll({ force = false, onProgress } = {}) {
+    if (this._analyzeLock) {
+      logInfo("librarian.analyze.busy");
+      return this._analyzeLock;
+    }
+    this._analyzeLock = this.#analyzeAll({ force, onProgress }).finally(() => {
+      this._analyzeLock = null;
+    });
+    return this._analyzeLock;
+  }
+
+  async #analyzeAll({ force = false, onProgress } = {}) {
     const all = listCatalog();
     const tracks = all.filter(track => force || !track.analyzedAt);
     logInfo("librarian.analyze.start", {
@@ -18,13 +34,15 @@ export class Librarian {
     });
     const results = [];
     const failures = [];
-    for (const track of tracks) {
+    for (const [index, track] of tracks.entries()) {
+      onProgress?.(`Analyzing ${index + 1}/${tracks.length}: ${track.name}`);
       try {
         results.push(await this.analyzeTrack(track.soundId));
       } catch (err) {
         logError("librarian.analyze.track.failed", { name: track.name, path: track.path, error: err });
         failures.push({ name: track.name, error: err.message || String(err) });
       }
+      await yieldUi();
     }
     logInfo("librarian.analyze.done", {
       ok: results.length,
@@ -146,38 +164,63 @@ export class Librarian {
       features = filenameFeatures(track.name, track.path, err.message);
     }
 
+    const title = moodFromTitle(track.name, track.path);
     const filenameTags = filenameHints(track.name, track.path);
+    const seedMood = title?.mood || features.mood;
     let card = {
-      tags: [...new Set([...(features.tags ?? []), ...filenameTags])],
-      mood: features.mood,
-      intensity: features.intensity,
+      tags: unique([...(title?.tags ?? []), ...(features.tags ?? []), ...filenameTags]),
+      mood: seedMood,
+      intensity: title?.intensity || features.intensity,
       setting: filenameTags.filter(tag => ["tavern", "forest", "dungeon", "city", "sea", "cave"].includes(tag)),
       instruments: [],
-      useWhen: defaultUseWhen(features.mood),
-      avoidWhen: features.mood === "combat" ? "Quiet social scenes" : "Peak combat",
+      useWhen: title?.useWhen || defaultUseWhen(seedMood),
+      avoidWhen: title?.avoidWhen || (seedMood === "combat" ? "Quiet social scenes" : "Peak combat"),
       features,
-      heuristic: true
+      heuristic: !title
     };
+    if (title) {
+      logInfo("librarian.track.title", {
+        name: track.name,
+        mood: title.mood,
+        title: title.title,
+        intensity: title.intensity
+      });
+    }
     if (hasLlmKey()) {
       try {
         const llmCard = await chatJson([
           {
             role: "system",
-            content: `You are the Librarian agent for a TTRPG soundtrack DJ. Write a compact catalog card from local audio features and the filename. Moods: ${MOODS.join(", ")}.${extraSystem()}`
+            content: `You are the Librarian agent for a TTRPG soundtrack DJ. Tag from the TRACK TITLE first. SuggestedMood from the filename is authoritative when present. Web Audio energy on mastered game OST is often 0.03-0.18 — quiet is not horror, and you must not copy a MIR mood that contradicts the title. Moods: ${MOODS.join(", ")}.${extraSystem()}`
           },
           {
             role: "user",
             content: JSON.stringify({
+              soundId,
               name: track.name,
               path: track.path,
-              features,
+              suggestedMood: title?.mood || null,
+              audio: {
+                duration: features.duration,
+                tempo: features.tempo,
+                energy: features.energy
+              },
               filenameTags
             })
           }
-        ], 'Schema: {"tags":[],"mood":"","intensity":1,"setting":[],"instruments":[],"useWhen":"","avoidWhen":""}');
+        ], 'Schema: {"soundId":"","tags":[],"mood":"","intensity":1,"setting":[],"instruments":[],"useWhen":"","avoidWhen":""}');
+        const llmMood = String(llmCard.mood || "").toLowerCase();
+        if (title?.mood && llmMood && llmMood !== title.mood) {
+          logInfo("librarian.track.llm.mood.ignored", {
+            name: track.name,
+            soundId,
+            title: title.mood,
+            llm: llmMood
+          });
+        }
         card = {
           tags: unique([...(llmCard.tags ?? []), ...card.tags]),
-          mood: llmCard.mood || card.mood,
+          mood: title?.mood || llmMood || card.mood,
           intensity: Number(llmCard.intensity ?? card.intensity),
           setting: llmCard.setting ?? card.setting,
           instruments: llmCard.instruments ?? [],
@@ -188,12 +231,13 @@ export class Librarian {
         };
         logInfo("librarian.track.llm.ok", {
           name: track.name,
+          soundId,
           mood: card.mood,
           intensity: card.intensity,
           tags: card.tags
         });
       } catch (err) {
-        logWarn("librarian.track.llm.failed", { name: track.name, error: err });
+        logWarn("librarian.track.llm.failed", { name: track.name, soundId, error: err });
       }
     } else {
       logInfo("librarian.track.llm.skipped", { name: track.name, reason: "no LLM key or base URL" });
@@ -210,26 +254,33 @@ export class Librarian {
 }
 
 function filenameFeatures(name, path, reason) {
-  const tags = filenameHints(name, path);
-  const mood = tags.includes("combat") || tags.includes("battle")
-    ? "combat"
-    : tags.includes("tavern") || tags.includes("inn")
-      ? "tavern"
-      : tags.includes("horror") || tags.includes("dark")
-        ? "horror"
-        : tags.includes("ambient")
-          ? "ambient"
-          : "exploration";
+  const title = moodFromTitle(name, path);
+  const tags = unique([...(title?.tags ?? []), ...filenameHints(name, path)]);
+  const mood = title?.mood || guessFilenameMood(tags);
   return {
     backend: "filename",
     duration: 0,
     tempo: 100,
     energy: mood === "combat" ? 0.5 : 0.1,
     mood,
-    intensity: mood === "combat" ? 5 : 3,
+    intensity: title?.intensity || (mood === "combat" ? 5 : 3),
     tags,
     decodeError: reason || "decode failed"
   };
+}
+
+function guessFilenameMood(tags) {
+  if (tags.includes("combat") || tags.includes("battle") || tags.includes("boss")) return "combat";
+  if (tags.includes("tavern") || tags.includes("inn")) return "tavern";
+  if (tags.includes("horror") || tags.includes("dark")) return "horror";
+  if (tags.includes("ambient")) return "ambient";
+  if (tags.includes("travel")) return "travel";
+  if (tags.includes("epic")) return "epic";
+  return "exploration";
+}
+
+function yieldUi() {
+  return new Promise(resolve => setTimeout(resolve, 0));
 }
 
 function filenameHints(name, path) {

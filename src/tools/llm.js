@@ -11,7 +11,7 @@ function headers(cfg) {
   return h;
 }
 
-export async function chatComplete({ messages, tools, toolChoice = "auto", temperature, maxTokens, topP, json = false }) {
+export async function chatComplete({ messages, tools, toolChoice = "auto", temperature, maxTokens, topP, json = false, timeoutMs, signal }) {
   const cfg = llmConfig();
   if (!cfg.baseUrl) {
     logError("llm.config.empty", publicLlmConfig());
@@ -39,17 +39,24 @@ export async function chatComplete({ messages, tools, toolChoice = "auto", tempe
     jsonMode: json,
     toolCount: tools?.length ?? 0,
     messageCount: messages?.length ?? 0,
+    timeoutMs: timeoutMs ?? 20000,
     ...publicLlmConfig()
   });
+  const timeout = AbortSignal.timeout(timeoutMs ?? 20000);
+  const combined = combineSignals(timeout, signal);
   let response;
   try {
     response = await fetch(url, {
       method: "POST",
       headers: headers(cfg),
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20000)
+      signal: combined
     });
   } catch (err) {
+    if (signal?.aborted) {
+      logInfo("llm.fetch.aborted", { url, elapsedMs: Date.now() - started });
+      throw err;
+    }
     logError("llm.fetch.failed", { url, error: err, elapsedMs: Date.now() - started });
     throw err;
   }
@@ -111,4 +118,18 @@ export function parseJsonContent(content) {
 export function extraSystem() {
   const extra = llmConfig().extraInstructions;
   return extra ? `\nGM extra instructions:\n${extra}` : "";
+}
+
+function combineSignals(timeout, extra) {
+  if (!extra) return timeout;
+  if (typeof AbortSignal.any === "function") return AbortSignal.any([timeout, extra]);
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (timeout.aborted || extra.aborted) {
+    abort();
+    return controller.signal;
+  }
+  timeout.addEventListener("abort", abort, { once: true });
+  extra.addEventListener("abort", abort, { once: true });
+  return controller.signal;
 }

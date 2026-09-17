@@ -1,4 +1,5 @@
 import { MOODS } from "../constants.js";
+import { moodFromTitle } from "./title-mood.js";
 
 const MOOD_SET = new Set(MOODS);
 
@@ -43,15 +44,99 @@ export function tableRowsFromCatalog(tracks = [], { fill = true } = {}) {
 export function parseTableDraft(value) {
   const text = String(value || "").trim();
   if (!text) return [];
-  if (text.startsWith("[")) {
+  if (text.startsWith("[") || text.startsWith("{")) {
     try {
-      const parsed = JSON.parse(text);
-      return Array.isArray(parsed) ? parsed : [];
+      return parseCatalogJson(text);
     } catch {
       return [];
     }
   }
   return parseManualCatalog(text);
+}
+
+/** Loose name for matching Foundry playlist sounds to import JSON. */
+export function normalizeMatchName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop()
+    .replace(/\.[a-z0-9]{2,5}$/i, "")
+    .replace(/[_./\\]+/g, " ")
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function parseCatalogJson(input) {
+  const data = typeof input === "string" ? JSON.parse(input) : input;
+  const list = Array.isArray(data)
+    ? data
+    : data?.tracks ?? data?.rows ?? data?.catalog ?? data?.cards;
+  if (!Array.isArray(list)) {
+    throw new Error("JSON must be an array of tracks or { tracks: [] }");
+  }
+  return list.map(normalizeImportTrack).filter(row => row.name || row.file || row.soundId);
+}
+
+export function exportCatalogJson(rows = [], extra = {}) {
+  return {
+    module: "agentic-dj",
+    format: 1,
+    exportedAt: extra.exportedAt || new Date().toISOString(),
+    tracks: rows.map(row => {
+      const tags = Array.isArray(row.tags) ? unique(row.tags) : splitTags(row.tags);
+      return {
+        included: row.included !== false,
+        soundId: row.soundId || "",
+        name: row.name || row.foundryName || "",
+        playlistName: row.playlistName || "",
+        file: row.file || row.path || "",
+        mood: normalizeMood(row.mood),
+        intensity: parseIntensity(row.intensity) || undefined,
+        tags,
+        useWhen: row.useWhen || "",
+        avoidWhen: row.avoidWhen || ""
+      };
+    })
+  };
+}
+
+export function applyImportedTracks(catalog = [], importedRaw) {
+  const imported = parseCatalogJson(importedRaw);
+  const maps = buildMatchMaps(catalog);
+  const overlay = new Map();
+  const unmatched = [];
+  for (const row of imported) {
+    const track = matchImportedTrack(row, catalog, maps);
+    if (!track) {
+      unmatched.push(row.name || row.file || row.soundId);
+      continue;
+    }
+    overlay.set(track.soundId, row);
+  }
+  const rows = catalog.map(track => {
+    const hit = overlay.get(track.soundId);
+    if (!hit) return tableRowsFromCatalog([track], { fill: true })[0];
+    return {
+      included: hit.included !== false,
+      soundId: track.soundId,
+      name: track.name,
+      playlistName: track.playlistName || "",
+      mood: hit.mood || "",
+      intensity: hit.intensity || "",
+      tags: Array.isArray(hit.tags) ? hit.tags.join(", ") : (hit.tags || ""),
+      useWhen: hit.useWhen || "",
+      avoidWhen: hit.avoidWhen || "",
+      analyzed: Boolean(track.mood || track.features)
+    };
+  });
+  return {
+    rows,
+    matched: overlay.size,
+    unmatched,
+    scanned: imported.length
+  };
 }
 
 export function serializeTableDraft(rows = []) {
@@ -93,22 +178,7 @@ export function normalizeManualRow(row = {}) {
 }
 
 export function matchRowToTrack(row, catalog = []) {
-  if (row?.soundId) {
-    const byId = catalog.find(track => track.soundId === row.soundId);
-    if (byId) return byId;
-  }
-  const needle = normalizeName(row?.name);
-  if (!needle) return null;
-  const exact = catalog.find(track => normalizeName(track.name) === needle);
-  if (exact) return exact;
-  const withPlaylist = catalog.find(track => normalizeName(`${track.playlistName} / ${track.name}`) === needle);
-  if (withPlaylist) return withPlaylist;
-  const byPath = catalog.find(track => {
-    const path = String(track.path || "").replace(/\\/g, "/");
-    const base = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "";
-    return normalizeName(base) === needle;
-  });
-  return byPath ?? null;
+  return matchImportedTrack(row, catalog, buildMatchMaps(catalog));
 }
 
 export function filenameHints(name, path = "") {
@@ -121,17 +191,18 @@ export function filenameHints(name, path = "") {
 }
 
 export function heuristicCard(row, track) {
-  const tags = unique([...(row.tags ?? []), ...filenameHints(row.name, track?.path)]);
-  const mood = row.mood || guessMood(tags);
-  const intensity = row.intensity || (mood === "combat" || mood === "epic" ? 5 : mood === "ambient" ? 1 : 3);
+  const title = moodFromTitle(row.name || track?.name, track?.path);
+  const tags = unique([...(row.tags ?? []), ...(title?.tags ?? []), ...filenameHints(row.name, track?.path)]);
+  const mood = row.mood || title?.mood || guessMood(tags);
+  const intensity = row.intensity || title?.intensity || (mood === "combat" || mood === "epic" ? 5 : mood === "ambient" ? 1 : 3);
   return {
     tags,
     mood,
     intensity,
     setting: tags.filter(tag => ["tavern", "forest", "dungeon", "city", "sea", "cave"].includes(tag)),
     instruments: [],
-    useWhen: row.useWhen || defaultUseWhen(mood),
-    avoidWhen: row.avoidWhen || (mood === "combat" ? "Quiet social scenes" : "Peak combat"),
+    useWhen: row.useWhen || title?.useWhen || defaultUseWhen(mood),
+    avoidWhen: row.avoidWhen || title?.avoidWhen || (mood === "combat" ? "Quiet social scenes" : "Peak combat"),
     features: {
       backend: "manual",
       duration: 0,
@@ -141,7 +212,7 @@ export function heuristicCard(row, track) {
       intensity,
       tags
     },
-    heuristic: true
+    heuristic: !row.mood
   };
 }
 
@@ -160,7 +231,84 @@ export function mergeCard(base, llmCard = {}) {
 }
 
 function normalizeName(value) {
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return normalizeMatchName(value);
+}
+
+function normalizeImportTrack(row = {}) {
+  const file = row.file || row.path || row.filename || "";
+  const name = row.name || row.foundryName || row.title || "";
+  const aliases = [
+    name,
+    row.foundryName,
+    file,
+    ...(Array.isArray(row.aliases) ? row.aliases : [])
+  ].filter(Boolean);
+  return {
+    included: row.included !== false,
+    soundId: row.soundId || "",
+    name,
+    file,
+    playlistName: row.playlistName || row.playlist || "",
+    mood: normalizeMood(row.mood),
+    intensity: parseIntensity(row.intensity),
+    tags: Array.isArray(row.tags) ? unique(row.tags) : splitTags(row.tags),
+    useWhen: row.useWhen || "",
+    avoidWhen: row.avoidWhen || "",
+    aliases
+  };
+}
+
+function trackKeys(track) {
+  const path = String(track.path || track.file || "").replace(/\\/g, "/");
+  const stem = path.split("/").pop() || "";
+  return [
+    track.soundId,
+    normalizeMatchName(track.name),
+    normalizeMatchName(`${track.playlistName || ""} ${track.name || ""}`),
+    normalizeMatchName(stem),
+    normalizeMatchName(track.file),
+    normalizeMatchName(track.foundryName)
+  ].filter(Boolean);
+}
+
+function buildMatchMaps(catalog = []) {
+  const byId = new Map();
+  const byLoose = new Map();
+  const bySuffix = new Map();
+  for (const track of catalog) {
+    if (track.soundId) byId.set(track.soundId, track);
+    for (const key of trackKeys(track)) {
+      if (key === track.soundId) continue;
+      if (byLoose.has(key) && byLoose.get(key) !== track) byLoose.set(key, null);
+      else if (!byLoose.has(key)) byLoose.set(key, track);
+    }
+    const suffix = normalizeMatchName(track.name).replace(/^\d+\s+\d+\s+/, "");
+    if (suffix && suffix !== normalizeMatchName(track.name)) {
+      if (bySuffix.has(suffix) && bySuffix.get(suffix) !== track) bySuffix.set(suffix, null);
+      else if (!bySuffix.has(suffix)) bySuffix.set(suffix, track);
+    }
+  }
+  return { byId, byLoose, bySuffix };
+}
+
+function matchImportedTrack(row, catalog = [], maps = buildMatchMaps(catalog)) {
+  if (row?.soundId && maps.byId.has(row.soundId)) return maps.byId.get(row.soundId);
+  const needles = [
+    row?.name,
+    row?.foundryName,
+    row?.file,
+    row?.path,
+    ...(row?.aliases ?? [])
+  ].filter(Boolean);
+  for (const needle of needles) {
+    const key = normalizeMatchName(needle);
+    if (key && maps.byLoose.get(key)) return maps.byLoose.get(key);
+  }
+  for (const needle of needles) {
+    const suffix = normalizeMatchName(needle).replace(/^\d+\s+\d+\s+/, "");
+    if (suffix && maps.bySuffix.get(suffix)) return maps.bySuffix.get(suffix);
+  }
+  return null;
 }
 
 function normalizeMood(value) {

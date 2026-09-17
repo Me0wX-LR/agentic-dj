@@ -35,6 +35,36 @@
   border-top: 1px solid var(--color-border-light-tertiary, #555);
 }
 
+.agentic-dj-manual {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.agentic-dj-manual .agentic-dj-settings {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.agentic-dj-manual-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 6;
+  pointer-events: auto;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--color-cool-5, #1b1d1f);
+  border-top: 1px solid var(--color-border-light-tertiary, #555);
+}
+
+.agentic-dj-manual-footer button {
+  pointer-events: auto;
+}
+
 .agentic-dj-app {
   display: flex;
   flex-direction: column;
@@ -68,7 +98,9 @@
 
 .agentic-dj-table-wrap {
   overflow: auto;
-  max-height: 28rem;
+  flex: 1 1 auto;
+  min-height: 12rem;
+  max-height: none;
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-radius: 6px;
   margin: 0.5rem 0 0.75rem;
@@ -107,12 +139,6 @@
 
 .agentic-dj-table td input[type="number"] {
   width: 4rem;
-}
-
-.agentic-dj-manual-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
 }
 
 .agentic-dj-viewer-body {
@@ -183,6 +209,18 @@
 .agentic-dj-card h3 {
   margin: 0 0 0.4rem;
   font-size: 1rem;
+}
+
+.agentic-dj-gmnote-label {
+  display: block;
+  font-weight: 600;
+  margin: 0.6rem 0 0.25rem;
+}
+
+.agentic-dj-card textarea[name="gmPrompt"] {
+  width: 100%;
+  min-height: 4.5rem;
+  resize: vertical;
 }
 
 .agentic-dj-meta,

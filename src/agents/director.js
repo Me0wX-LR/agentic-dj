@@ -1,7 +1,7 @@
 import { DIRECTOR_TOOLS } from "../constants.js";
 import { logInfo, logWarn } from "../debug/log.js";
 import { listCatalog } from "../rag/catalog.js";
-import { catalogMoodCounts, inferWantedMood, retrieveTracks, verifyCandidates } from "../rag/retrieve.js";
+import { catalogMoodCounts, inferWantedIntensity, inferWantedMood, retrieveTracks, verifyCandidates } from "../rag/retrieve.js";
 import { hasLlmKey, setting } from "../settings.js";
 import { chatComplete, extraSystem, parseJsonContent } from "../tools/llm.js";
 
@@ -10,31 +10,34 @@ export class Director {
     this.memory = memory;
   }
 
-  async plan(situation, { recoverFrom = null } = {}) {
+  async plan(situation, { recoverFrom = null, liveSituation = null, signal = null } = {}) {
     const catalog = listCatalog().filter(track => track.features || track.mood);
     const moods = catalogMoodCounts(catalog);
+    const live = enrichSituation(liveSituation?.() || situation);
     logInfo("director.plan.start", {
       catalogWithCards: catalog.length,
       hasLlm: hasLlmKey(),
       recoverFrom,
-      mood: inferWantedMood(situation),
-      intensity: situation.intensity,
+      mood: live.wantedMood,
+      intensity: live.intensity,
+      transcript: String(live.transcript || "").slice(0, 160),
       catalogMoods: moods.moods,
       homogeneous: moods.homogeneous,
       skipped: this.memory.snapshot().skippedIds?.length ?? 0
     });
     if (!hasLlmKey() || catalog.length === 0) {
-      const local = this.localPlan(situation, catalog);
+      const local = this.localPlan(live, catalog);
       logInfo("director.plan.local", { reason: !hasLlmKey() ? "no-llm-key" : "empty-catalog", cueCount: local.cues.length });
       return local;
     }
     try {
-      const planned = await this.agentPlan(situation, catalog, recoverFrom);
+      const planned = await this.agentPlan(live, catalog, recoverFrom, { liveSituation, signal });
       logInfo("director.plan.llm", { cueCount: planned.cues.length, usedLlm: planned.usedLlm });
       return planned;
     } catch (err) {
+      if (signal?.aborted || err?.name === "AbortError") throw err;
       logWarn("director.plan.llm.failed", { error: err });
-      return { ...this.localPlan(situation, catalog), fallback: String(err.message || err) };
+      return { ...this.localPlan(enrichSituation(liveSituation?.() || situation), catalog), fallback: String(err.message || err) };
     }
   }
 
@@ -60,41 +63,50 @@ export class Director {
     };
   }
 
-  async agentPlan(situation, catalog, recoverFrom) {
+  async agentPlan(situation, catalog, recoverFrom, { liveSituation, signal } = {}) {
     const memory = () => this.memory.snapshot();
+    const live = () => enrichSituation(liveSituation?.() || situation);
     const tools = {
-      get_foundry_context: () => situation,
-      search_catalog: (args = {}) => retrieveTracks(catalog, situation, memory(), {
-        ...args,
-        query: args.query || situation.transcript || ""
-      }).map(row => ({
-        soundId: row.track.soundId,
-        name: row.track.name,
-        mood: row.track.mood,
-        intensity: row.track.intensity,
-        tags: row.track.tags,
-        useWhen: row.track.useWhen,
-        avoidWhen: row.track.avoidWhen,
-        score: row.score,
-        reasons: row.reasons
-      })),
-      verify_candidates: (args = {}) => verifyCandidates(
-        catalog,
-        args.soundIds ?? [],
-        situation,
-        memory(),
-        args.intendedMood || inferWantedMood(situation),
-        args.intendedIntensity || situation.intensity
-      ),
+      get_foundry_context: () => live(),
+      search_catalog: (args = {}) => {
+        const sit = live();
+        return retrieveTracks(catalog, sit, memory(), {
+          ...args,
+          query: args.query || sit.transcript || ""
+        }).map(row => ({
+          soundId: row.track.soundId,
+          name: row.track.name,
+          mood: row.track.mood,
+          intensity: row.track.intensity,
+          tags: row.track.tags,
+          useWhen: row.track.useWhen,
+          avoidWhen: row.track.avoidWhen,
+          score: row.score,
+          reasons: row.reasons
+        }));
+      },
+      verify_candidates: (args = {}) => {
+        const sit = live();
+        return verifyCandidates(
+          catalog,
+          args.soundIds ?? [],
+          sit,
+          memory(),
+          args.intendedMood,
+          args.intendedIntensity || sit.intensity
+        );
+      },
       propose_cues: args => args
     };
 
     const moods = catalogMoodCounts(catalog);
+    const opening = live();
     const messages = [
       {
         role: "system",
         content: `You are the Director agent of Agentic DJ for Foundry VTT.
-The mood field is a weak heuristic. Read transcript and chat in ANY language (Cantonese, Mandarin, Japanese, English) and infer the real table mood yourself.
+The mood field is a weak heuristic. Read transcript, GM typed notes, and chat in ANY language (Cantonese, Mandarin, Japanese, English) and infer the real table mood yourself.
+Death, blood, and fighting (死、流血、打交) are combat/horror, never exploration beds.
 Use tools to search and verify the music catalog. Never invent soundIds.
 Search with the inferred mood AND a short query taken from the transcript. Do not blindly reuse mood=exploration.
 If the catalog is mostly one stored mood, ignore those labels and rank by energy, tempo, intensity, and name.
@@ -106,7 +118,8 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
       {
         role: "user",
         content: JSON.stringify({
-          situation,
+          situation: opening,
+          wantedMood: opening.wantedMood,
           recoverFrom,
           memory: memory(),
           catalogSize: catalog.length,
@@ -117,8 +130,13 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
     ];
 
     let proposal = null;
-    for (let step = 0; step < 6; step++) {
-      const message = await chatComplete({ messages, tools: DIRECTOR_TOOLS });
+    for (let step = 0; step < 5; step++) {
+      if (signal?.aborted) {
+        const err = new Error("Plan aborted");
+        err.name = "AbortError";
+        throw err;
+      }
+      const message = await chatComplete({ messages, tools: DIRECTOR_TOOLS, timeoutMs: 18000, signal });
       messages.push(message);
       const calls = message.tool_calls ?? [];
       if (!calls.length) {
@@ -153,15 +171,15 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
       if (proposal?.cues) break;
     }
 
-    if (!proposal?.cues?.length) return this.localPlan(situation, catalog);
+    if (!proposal?.cues?.length) return this.localPlan(live(), catalog);
 
     const verified = verifyCandidates(
       catalog,
       proposal.cues.map(cue => cue.soundId),
-      situation,
+      live(),
       this.memory.snapshot(),
-      inferWantedMood(situation),
-      situation.intensity
+      inferWantedMood(live()),
+      live().intensity
     );
     const cues = verified.kept.slice(0, Number(setting("maxProposals") || 3)).map(row => {
       const llmWhy = proposal.cues.find(cue => cue.soundId === row.track.soundId)?.why;
@@ -177,7 +195,7 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
         verified: true
       };
     });
-    if (!cues.length) return this.localPlan(situation, catalog);
+    if (!cues.length) return this.localPlan(live(), catalog);
     this.memory.noteProposed(cues.map(cue => cue.soundId));
     return {
       plan: proposal.plan || "LLM Director verified catalog matches.",
@@ -186,6 +204,16 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
       usedLlm: true
     };
   }
+}
+
+function enrichSituation(situation = {}) {
+  const wantedMood = inferWantedMood(situation);
+  return {
+    ...situation,
+    wantedMood,
+    mood: wantedMood,
+    intensity: inferWantedIntensity({ ...situation, wantedMood })
+  };
 }
 
 function safeParse(value) {

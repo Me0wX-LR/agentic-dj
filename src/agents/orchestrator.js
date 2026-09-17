@@ -24,6 +24,9 @@ export class Orchestrator {
     this.app = null;
     this.debounce = null;
     this.analysisProgress = "";
+    this._analyzeLock = null;
+    this._planAbort = null;
+    this.gmPrompt = "";
   }
 
   async start() {
@@ -62,11 +65,30 @@ export class Orchestrator {
   }
 
   async analyzeLibrary(force = false) {
+    if (this._analyzeLock) {
+      logInfo("orchestrator.analyze.busy", { force, status: this.status });
+      ui.notifications.info(game.i18n.localize("AGENTICDJ.AnalyzeBusy"));
+      return this._analyzeLock;
+    }
+    this._analyzeLock = this.#analyzeLibrary(force).finally(() => {
+      this._analyzeLock = null;
+    });
+    return this._analyzeLock;
+  }
+
+  async #analyzeLibrary(force = false) {
     this.status = "analyzing";
+    this.analysisProgress = game.i18n.localize("AGENTICDJ.Analyzing");
     this.refreshUi();
     logInfo("orchestrator.analyze", { force });
     try {
-      const { results, failures, scanned, catalogSize } = await this.librarian.analyzeAll({ force });
+      const { results, failures, scanned, catalogSize } = await this.librarian.analyzeAll({
+        force,
+        onProgress: message => {
+          this.analysisProgress = message;
+          this.refreshUi();
+        }
+      });
       this.status = "idle";
       if (!catalogSize) {
         ui.notifications.warn(game.i18n.localize("AGENTICDJ.NoTracks"));
@@ -99,7 +121,9 @@ export class Orchestrator {
     this.refreshUi();
     logInfo("orchestrator.manual.analyze", { suggestAfter, situationChars: situationNote.length });
     try {
-      await game.settings.set(MODULE_ID, "manualCatalogDraft", text);
+      void game.settings.set(MODULE_ID, "manualCatalogDraft", text).catch(err => {
+        logError("orchestrator.manual.draft.failed", { error: err });
+      });
       const { results, failures, unmatched, scanned } = await this.librarian.analyzeFromList(text, {
         onProgress: message => {
           this.analysisProgress = message;
@@ -126,7 +150,9 @@ export class Orchestrator {
     const { serializeTableDraft } = await import("../rag/manual-catalog.js");
     logInfo("orchestrator.manual.table", { rows: rows.length, suggestAfter, llmFill });
     try {
-      await game.settings.set(MODULE_ID, "manualCatalogDraft", serializeTableDraft(rows));
+      void game.settings.set(MODULE_ID, "manualCatalogDraft", serializeTableDraft(rows)).catch(err => {
+        logError("orchestrator.manual.draft.failed", { error: err });
+      });
       const { results, failures, unmatched, scanned } = await this.librarian.saveRows(rows, {
         llmFill,
         onProgress: message => {
@@ -175,6 +201,9 @@ export class Orchestrator {
   }
 
   async suggestNow({ recoverFrom = null } = {}) {
+    this._planAbort?.abort();
+    this._planAbort = new AbortController();
+    const signal = this._planAbort.signal;
     const token = ++this.planSeq;
     this.status = "planning";
     this.lastSuggestAt = Date.now();
@@ -190,7 +219,11 @@ export class Orchestrator {
       planSeq: token
     });
     try {
-      const proposal = await this.director.plan(this.situation, { recoverFrom });
+      const proposal = await this.director.plan(this.situation, {
+        recoverFrom,
+        liveSituation: () => this.listener.brief(),
+        signal
+      });
       if (token !== this.planSeq) {
         logInfo("orchestrator.suggest.stale", { token, current: this.planSeq });
         return this.proposal;
@@ -206,7 +239,10 @@ export class Orchestrator {
       });
       return this.proposal;
     } catch (err) {
-      if (token !== this.planSeq) return this.proposal;
+      if (token !== this.planSeq || err?.name === "AbortError") {
+        logInfo("orchestrator.suggest.aborted", { token, current: this.planSeq, error: err?.message });
+        return this.proposal;
+      }
       this.status = "error";
       logError("orchestrator.suggest.failed", { error: err });
       ui.notifications.error(err.message);
@@ -214,6 +250,21 @@ export class Orchestrator {
     } finally {
       if (token === this.planSeq) this.refreshUi();
     }
+  }
+
+  async promptFromGm(text) {
+    const clean = String(text || "").trim();
+    if (clean) {
+      this.gmPrompt = clean;
+      this.listener.transcript = mergeUtterance(this.listener.transcript, clean, "manual");
+      this.situation = this.listener.brief();
+      logInfo("orchestrator.gmPrompt", {
+        chars: clean.length,
+        mood: this.situation.mood,
+        preview: clean.slice(0, 160)
+      });
+    }
+    return this.suggestNow();
   }
 
   async playCue(soundId) {
@@ -308,7 +359,8 @@ export class Orchestrator {
       catalog: catalogStats(),
       memory: this.memory.snapshot(),
       memoryPath: memoryPath(),
-      analysisProgress: this.analysisProgress
+      analysisProgress: this.analysisProgress,
+      gmPrompt: this.gmPrompt || ""
     };
   }
 
@@ -331,8 +383,8 @@ export class Orchestrator {
       transcript: String(brief.transcript || "").slice(0, 160)
     });
     if (reason === "mic-start" || reason === "mic-stop" || reason === "mic-lapse" || reason === "transcript-clear") return;
-    if (this.status === "planning") {
-      logInfo("orchestrator.autosuggest.busy", { reason });
+    if (this.status === "planning" || this.status === "analyzing") {
+      logInfo("orchestrator.autosuggest.busy", { reason, status: this.status });
       return;
     }
     const cooldown = Number(setting("cooldown") || 20) * 1000;
@@ -342,7 +394,7 @@ export class Orchestrator {
     }
     clearTimeout(this.debounce);
     this.debounce = setTimeout(() => {
-      if (this.status === "planning") return;
+      if (this.status === "planning" || this.status === "analyzing") return;
       this.suggestNow().catch(err => logError("orchestrator.autosuggest.failed", { error: err }));
     }, 1500);
   }

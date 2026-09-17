@@ -7,7 +7,7 @@ const COMBAT_MOODS = new Set(["combat", "epic", "tension"]);
 const CALM_MOODS = new Set(["ambient", "exploration", "social", "tavern", "travel", "sad"]);
 
 const MOOD_RULES = [
-  { mood: "combat", re: /combat|fight|initiative|attack|battle|ambush|\bkill(?:ed)?\b|\bdy(?:ing|ed)\b|\bdeath\b|slaughter|戰鬥|打仗|開戰|攻擊|攻撃|戦い|戦闘|先攻|死咗|死了|死人|殺死|擊殺|敵人/i },
+  { mood: "combat", re: /combat|fight|initiative|attack|battle|ambush|\bkill(?:ed)?\b|\bdy(?:ing|ed)\b|\bdeath\b|slaughter|戰鬥|打仗|開戰|攻擊|攻撃|戦い|戦闘|先攻|死咗|死了|死人|死曬|殺死|擊殺|敵人|打交|打緊交|流血|流曬血/i },
   { mood: "tavern", re: /tavern|\binn\b|\bale\b|\bbar\b|酒館|酒吧|旅館|旅馆|居酒屋/i },
   { mood: "horror", re: /horror|undead|haunt|fear|dread|恐怖|鬼|亡靈|haunt/i },
   { mood: "sad", re: /sad|funeral|grief|loss|悲傷|葬禮|哭喪|哀悼/i },
@@ -64,7 +64,7 @@ function matchMood(text) {
   return "";
 }
 
-function resolveSearchMood(requested, inferred) {
+export function resolveSearchMood(requested, inferred) {
   if (!requested) return inferred;
   if (requested === "exploration" && inferred && inferred !== "exploration") return inferred;
   return requested;
@@ -194,7 +194,8 @@ export function verifyCandidates(catalog, soundIds, situation, memory, intendedM
   const byId = new Map(catalog.map(track => [track.soundId, track]));
   const dropped = [];
   const kept = [];
-  const wantedMood = intendedMood || inferWantedMood(situation);
+  const inferred = inferWantedMood(situation);
+  const wantedMood = resolveSearchMood(intendedMood, inferred);
   const extra = {
     ...situation,
     mood: wantedMood,

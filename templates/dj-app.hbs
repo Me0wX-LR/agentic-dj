@@ -4,8 +4,11 @@
       <i class="fa-solid fa-microphone"></i>
       {{#if listening}}{{localize "AGENTICDJ.Listening"}}{{else}}{{localize "AGENTICDJ.Listen"}}{{/if}}
     </button>
-    <button type="button" data-action="suggest" {{#if planning}}disabled{{/if}}><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.SuggestNow"}}</button>
-    <button type="button" data-action="analyze"><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.AnalyzeLibrary"}}</button>
+    <button type="button" data-action="suggest">
+      <i class="fa-solid fa-wand-magic-sparkles"></i>
+      {{#if planning}}{{localize "AGENTICDJ.Suggesting"}}{{else}}{{localize "AGENTICDJ.SuggestNow"}}{{/if}}
+    </button>
+    <button type="button" data-action="analyze" {{#if analyzing}}disabled{{/if}}><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.AnalyzeLibrary"}}</button>
     <button type="button" data-action="openManual"><i class="fa-solid fa-table"></i> {{localize "AGENTICDJ.Manual.Button"}}</button>
     <button type="button" data-action="stop"><i class="fa-solid fa-stop"></i> {{localize "AGENTICDJ.StopMusic"}}</button>
     <button type="button" data-action="openSettings"><i class="fa-solid fa-key"></i> {{localize "AGENTICDJ.SettingsMenuLabel"}}</button>
@@ -20,7 +23,13 @@
       <p class="agentic-dj-meta">{{statusLabel}} · {{situation.sceneName}} · {{situation.mood}} {{situation.intensity}}/5 · {{#if situation.inCombat}}Combat r{{situation.round}}{{else}}Out of combat{{/if}}</p>
       <p>{{transcript}}</p>
       <p class="agentic-dj-meta">{{transcriptAge}} · Now: {{playing}}</p>
-      <p><button type="button" data-action="clearTranscript">{{localize "AGENTICDJ.ClearTranscript"}}</button></p>
+      <label class="agentic-dj-gmnote-label">{{localize "AGENTICDJ.GmPrompt"}}</label>
+      <textarea name="gmPrompt" rows="3" placeholder="{{localize 'AGENTICDJ.GmPromptPlaceholder'}}">{{gmPrompt}}</textarea>
+      <p class="agentic-dj-meta">{{localize "AGENTICDJ.GmPromptHint"}}</p>
+      <p class="flexrow" style="gap:0.35rem;">
+        <button type="button" data-action="promptFromGm"><i class="fa-solid fa-keyboard"></i> {{localize "AGENTICDJ.GmPromptSubmit"}}</button>
+        <button type="button" data-action="clearTranscript">{{localize "AGENTICDJ.ClearTranscript"}}</button>
+      </p>
     </section>
 
     <section class="agentic-dj-card">
@@ -38,10 +47,10 @@
           <p>{{cue.why}}</p>
           <p class="agentic-dj-tags">{{#each cue.tags}}<span>{{this}}</span>{{/each}}</p>
           <footer>
-            <button type="button" data-action="play" data-sound-id="{{cue.soundId}}" {{#if ../planning}}disabled{{/if}}>{{localize "AGENTICDJ.Play"}}</button>
+            <button type="button" data-action="play" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Play"}}</button>
             <button type="button" data-action="preview" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Preview"}}</button>
-            <button type="button" data-action="skip" data-sound-id="{{cue.soundId}}" {{#if ../planning}}disabled{{/if}}>{{localize "AGENTICDJ.Skip"}}</button>
-            <button type="button" data-action="ban" data-sound-id="{{cue.soundId}}" {{#if ../planning}}disabled{{/if}}>{{localize "AGENTICDJ.Ban"}}</button>
+            <button type="button" data-action="skip" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Skip"}}</button>
+            <button type="button" data-action="ban" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Ban"}}</button>
           </footer>
         </article>
       {{/each}}

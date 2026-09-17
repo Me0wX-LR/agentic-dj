@@ -1,57 +1,63 @@
-<div class="standard-form flexcol agentic-dj-settings">
-  <p class="notes">{{localize "AGENTICDJ.Manual.Hint"}}</p>
-  <p class="agentic-dj-progress">{{progress}}</p>
+<div class="agentic-dj-manual">
+  <div class="standard-form flexcol agentic-dj-settings">
+    <p class="notes">{{localize "AGENTICDJ.Manual.Hint"}}</p>
+    <p class="agentic-dj-progress">{{progress}}</p>
 
-  <div class="form-group">
-    <label>{{localize "AGENTICDJ.Manual.Situation"}}</label>
-    <input type="text" name="situationNote" value="{{situationNote}}" placeholder="{{localize 'AGENTICDJ.Manual.SituationPlaceholder'}}" />
-    <p class="hint">{{localize "AGENTICDJ.Manual.SituationHint"}}</p>
-  </div>
+    <div class="form-group">
+      <label>{{localize "AGENTICDJ.Manual.Situation"}}</label>
+      <input type="text" name="situationNote" value="{{situationNote}}" placeholder="{{localize 'AGENTICDJ.Manual.SituationPlaceholder'}}" />
+      <p class="hint">{{localize "AGENTICDJ.Manual.SituationHint"}}</p>
+    </div>
 
-  <div class="agentic-dj-table-wrap">
-    <table class="agentic-dj-table">
-      <thead>
-        <tr>
-          <th>{{localize "AGENTICDJ.Manual.Include"}}</th>
-          <th>{{localize "AGENTICDJ.Manual.Track"}}</th>
-          <th>{{localize "AGENTICDJ.Manual.Mood"}}</th>
-          <th>{{localize "AGENTICDJ.Manual.Intensity"}}</th>
-          <th>{{localize "AGENTICDJ.Manual.Tags"}}</th>
-          <th>{{localize "AGENTICDJ.Manual.UseWhen"}}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each rows as |row|}}
-        <tr data-sound-id="{{row.soundId}}" data-name="{{row.name}}">
-          <td><input type="checkbox" name="include" {{#if row.included}}checked{{/if}} /></td>
-          <td>
-            <strong>{{row.name}}</strong>
-            <div class="agentic-dj-meta">{{row.playlistName}}</div>
-          </td>
-          <td>
-            <select name="mood">
-              {{#each row.moodOptions as |opt|}}
-              <option value="{{opt.id}}" {{#if opt.selected}}selected{{/if}}>{{opt.label}}</option>
-              {{/each}}
-            </select>
-          </td>
-          <td><input type="number" name="intensity" min="1" max="5" value="{{row.intensityValue}}" /></td>
-          <td><input type="text" name="tags" value="{{row.tags}}" /></td>
-          <td><input type="text" name="useWhen" value="{{row.useWhen}}" /></td>
-        </tr>
-        {{/each}}
-      </tbody>
-    </table>
+    <div class="agentic-dj-table-wrap">
+      <table class="agentic-dj-table">
+        <thead>
+          <tr>
+            <th>{{localize "AGENTICDJ.Manual.Include"}}</th>
+            <th>{{localize "AGENTICDJ.Manual.Track"}}</th>
+            <th>{{localize "AGENTICDJ.Manual.Mood"}}</th>
+            <th>{{localize "AGENTICDJ.Manual.Intensity"}}</th>
+            <th>{{localize "AGENTICDJ.Manual.Tags"}}</th>
+            <th>{{localize "AGENTICDJ.Manual.UseWhen"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each rows as |row|}}
+          <tr data-sound-id="{{row.soundId}}" data-name="{{row.name}}">
+            <td><input type="checkbox" name="include" {{#if row.included}}checked{{/if}} /></td>
+            <td>
+              <strong>{{row.name}}</strong>
+              <div class="agentic-dj-meta">{{row.playlistName}}</div>
+            </td>
+            <td>
+              <select name="mood">
+                {{#each row.moodOptions as |opt|}}
+                <option value="{{opt.id}}" {{#if opt.selected}}selected{{/if}}>{{opt.label}}</option>
+                {{/each}}
+              </select>
+            </td>
+            <td><input type="number" name="intensity" min="1" max="5" value="{{row.intensityValue}}" /></td>
+            <td><input type="text" name="tags" value="{{row.tags}}" /></td>
+            <td><input type="text" name="useWhen" value="{{row.useWhen}}" /></td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{#unless rows.length}}
+      <p>{{localize "AGENTICDJ.NoTracks"}}</p>
+    {{/unless}}
+    <input type="file" name="importJson" accept="application/json,.json" hidden />
   </div>
-  {{#unless rows.length}}
-    <p>{{localize "AGENTICDJ.NoTracks"}}</p>
-  {{/unless}}
 
   <footer class="form-footer agentic-dj-manual-footer">
-    <button type="button" data-action="fillEmpty"><i class="fa-solid fa-file"></i> {{localize "AGENTICDJ.Manual.FillEmpty"}}</button>
-    <button type="button" data-action="fillAnalyzed"><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.Manual.FillAnalyzed"}}</button>
-    <button type="button" data-action="save"><i class="fa-solid fa-floppy-disk"></i> {{localize "AGENTICDJ.Manual.Save"}}</button>
-    <button type="button" data-action="saveLlm"><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.Manual.SaveLlm"}}</button>
-    <button type="button" data-action="saveSuggest"><i class="fa-solid fa-play"></i> {{localize "AGENTICDJ.Manual.ApplySuggest"}}</button>
+    <button type="button" data-action="importJson" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-file-import"></i> {{localize "AGENTICDJ.Manual.ImportJson"}}</button>
+    <button type="button" data-action="pasteJson" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-clipboard"></i> {{localize "AGENTICDJ.Manual.PasteJson"}}</button>
+    <button type="button" data-action="exportJson" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-file-export"></i> {{localize "AGENTICDJ.Manual.ExportJson"}}</button>
+    <button type="button" data-action="fillEmpty" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-file"></i> {{localize "AGENTICDJ.Manual.FillEmpty"}}</button>
+    <button type="button" data-action="fillAnalyzed" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.Manual.FillAnalyzed"}}</button>
+    <button type="button" data-action="applyTags" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-floppy-disk"></i> {{localize "AGENTICDJ.Manual.Save"}}</button>
+    <button type="button" data-action="saveLlm" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.Manual.SaveLlm"}}</button>
+    <button type="button" data-action="saveSuggest" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-play"></i> {{localize "AGENTICDJ.Manual.ApplySuggest"}}</button>
   </footer>
 </div>

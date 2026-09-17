@@ -17,6 +17,7 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     actions: {
       listen: AgenticDjApp.onListen,
       suggest: AgenticDjApp.onSuggest,
+      promptFromGm: AgenticDjApp.onPromptFromGm,
       analyze: AgenticDjApp.onAnalyze,
       stop: AgenticDjApp.onStop,
       play: AgenticDjApp.onPlay,
@@ -63,6 +64,8 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
       ...snap,
       statusLabel: snap.status,
       planning: snap.status === "planning" || snap.status === "analyzing",
+      analyzing: snap.status === "analyzing",
+      gmPrompt: snap.gmPrompt || "",
       hasCues: snap.proposal.cues.length > 0,
       hasLlmKey: Boolean(llmKey),
       llmKeyHint: game.settings.get(MODULE_ID, "llmApiKeyHint") || "",
@@ -76,11 +79,34 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     await this.orchestrator.toggleListen();
   }
 
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    const field = this.element.querySelector('[name="gmPrompt"]');
+    if (!field || field.dataset.bound) return;
+    field.dataset.bound = "1";
+    field.addEventListener("input", event => {
+      this.orchestrator.gmPrompt = event.target.value;
+    });
+    field.addEventListener("keydown", event => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        AgenticDjApp.onPromptFromGm.call(this, event);
+      }
+    });
+  }
+
   static async onSuggest() {
     await this.orchestrator.suggestNow();
   }
 
+  static async onPromptFromGm() {
+    const text = this.element.querySelector('[name="gmPrompt"]')?.value ?? this.orchestrator.gmPrompt ?? "";
+    this.orchestrator.gmPrompt = text;
+    await this.orchestrator.promptFromGm(text);
+  }
+
   static async onAnalyze() {
+    if (this.orchestrator.status === "analyzing") return;
     await this.orchestrator.analyzeLibrary(true);
   }
 

@@ -9,8 +9,6 @@ import { extractFeatures } from "./audio-features.js";
 
 export { extractFeatures } from "./audio-features.js";
 
-let workerUsable = null;
-
 export async function analyzeSoundFile(path) {
   if (!path) throw new Error("Sound has no file path");
   const url = /^https?:/i.test(path) ? path : foundry.utils.getRoute(path);
@@ -26,16 +24,11 @@ export async function analyzeSoundFile(path) {
 }
 
 export async function analyzeArrayBuffer(arrayBuffer) {
-  if (workerUsable !== false) {
-    const forWorker = arrayBuffer.slice(0);
-    try {
-      const features = await analyzeInWorker(forWorker);
-      workerUsable = true;
-      return features;
-    } catch (err) {
-      workerUsable = false;
-      logWarn("audio.worker.fallback", { error: err, skipFurtherWorkers: true });
-    }
+  try {
+    const features = await analyzeInWorker(arrayBuffer.slice(0));
+    return features;
+  } catch (err) {
+    logWarn("audio.worker.fallback", { error: err });
   }
   const features = await analyzeOnMainThread(arrayBuffer);
   logInfo("audio.mainthread.ok", featureSummary(features));
@@ -48,7 +41,7 @@ function analyzeInWorker(arrayBuffer) {
     const timer = setTimeout(() => {
       worker.terminate();
       reject(new Error("audio worker timeout"));
-    }, 25000);
+    }, 60000);
     worker.onmessage = event => {
       clearTimeout(timer);
       worker.terminate();

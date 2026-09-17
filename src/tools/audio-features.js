@@ -47,42 +47,35 @@ export function extractFeatures(audioBuffer) {
   };
 }
 
+export function intensityFromEnergy(energy) {
+  const value = Number(energy);
+  if (!Number.isFinite(value)) return 3;
+  if (value >= 0.16) return 5;
+  if (value >= 0.12) return 4;
+  if (value >= 0.08) return 3;
+  if (value >= 0.04) return 2;
+  return 1;
+}
+
 export function heuristicTags({ energy, tempo, brightness, dynamics }) {
-  let mood = "exploration";
-  let intensity = 3;
-  const tags = [];
-  if (energy > 0.18 && tempo >= 120) {
-    mood = "combat";
-    intensity = 5;
-    tags.push("battle", "aggressive", "percussion");
-  } else if (energy > 0.12 && tempo >= 110) {
-    mood = "epic";
-    intensity = 4;
-    tags.push("heroic", "action");
-  } else if (energy < 0.05 && brightness < 0.25) {
-    mood = "ambient";
-    intensity = 1;
-    tags.push("drone", "calm");
-  } else if (brightness < 0.22 && energy < 0.1) {
-    mood = "horror";
-    intensity = 2;
-    tags.push("dark", "dissonant");
-  } else if (tempo < 90 && energy < 0.1) {
-    mood = "sad";
-    intensity = 2;
-    tags.push("slow", "melancholy");
-  } else if (tempo >= 90 && tempo <= 120 && energy < 0.12) {
-    mood = "tavern";
-    intensity = 2;
-    tags.push("folk", "social");
-  } else if (dynamics > 0.08 && energy > 0.08) {
-    mood = "tension";
-    intensity = 3;
-    tags.push("uneasy", "pulse");
-  } else {
-    tags.push("travel", "underscore");
+  const intensity = intensityFromEnergy(energy);
+  // Mastered OST RMS is often 0.03–0.18. Quiet + dark is not horror.
+  if (energy >= 0.16 && tempo >= 125) {
+    return { mood: "combat", intensity: Math.max(4, intensity), tags: ["battle", "aggressive"] };
   }
-  return { mood, intensity, tags };
+  if (energy >= 0.13 && tempo >= 110) {
+    return { mood: "epic", intensity: Math.max(3, intensity), tags: ["heroic", "action"] };
+  }
+  if (energy < 0.035 && brightness < 0.2) {
+    return { mood: "ambient", intensity: 1, tags: ["drone", "calm"] };
+  }
+  if (tempo < 85 && energy < 0.08) {
+    return { mood: "sad", intensity: 2, tags: ["slow", "melancholy"] };
+  }
+  if (dynamics > 0.08 && energy > 0.1) {
+    return { mood: "tension", intensity: 3, tags: ["uneasy", "pulse"] };
+  }
+  return { mood: "exploration", intensity, tags: ["underscore"] };
 }
 
 function mixMono(audioBuffer) {

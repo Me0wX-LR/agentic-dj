@@ -83,6 +83,8 @@ test("learned likes boost a track in that mood", () => {
 test("cantonese death language infers combat not exploration", async () => {
   const { inferWantedMood, retrieveTracks } = await import("../src/rag/retrieve.js");
   assert.equal(inferWantedMood({ transcript: "餵點呀hello hello 死咗好多人" }), "combat");
+  assert.equal(inferWantedMood({ transcript: "啲人死曬啦打緊交" }), "combat");
+  assert.equal(inferWantedMood({ transcript: "啲人死曬流曬血啦" }), "combat");
   const calm = {
     soundId: "c",
     name: "Rain",
@@ -124,6 +126,51 @@ test("mic transcript lapses after TTL", async () => {
   assert.equal(merged.length, 1);
   assert.equal(merged[0].text, "hello hello");
   assert.equal(similarUtterance("hello", "hello hello"), true);
+});
+
+test("title mood beats quiet OST horror heuristics", async () => {
+  const { moodFromTitle } = await import("../src/rag/title-mood.js");
+  const { heuristicTags } = await import("../src/tools/audio-features.js");
+  assert.equal(moodFromTitle("5 07 Peace Dove").mood, "ambient");
+  assert.equal(moodFromTitle("4 10 Around Flower").mood, "social");
+  assert.equal(moodFromTitle("5 04 Pure Heart").mood, "social");
+  assert.equal(moodFromTitle("4 12 Tears Of Hope").mood, "sad");
+  assert.equal(moodFromTitle("4 08 La Rosa").mood, "social");
+  assert.equal(moodFromTitle("4 07 Repulsion").mood, "combat");
+  assert.equal(moodFromTitle("4 09 Ascension").mood, "epic");
+  const quiet = heuristicTags({ energy: 0.093, tempo: 129, brightness: 0.18, dynamics: 0.02 });
+  assert.notEqual(quiet.mood, "horror");
+  const tears = heuristicTags({ energy: 0.118, tempo: 180, brightness: 0.3, dynamics: 0.02 });
+  assert.notEqual(tears.mood, "horror");
+});
+
+test("catalog JSON import matches Foundry names and filenames", async () => {
+  const { parseCatalogJson, applyImportedTracks, exportCatalogJson, normalizeMatchName } = await import("../src/rag/manual-catalog.js");
+  assert.equal(normalizeMatchName("5-01 - Piano Concerto Medley -dispel-.mp3"), normalizeMatchName("5 01 Piano Concerto Medley Dispel"));
+  const catalog = [
+    { soundId: "a", name: "1 01 Abgrund", playlistName: "Eustia", path: "Music/1-01 - Abgrund.mp3" },
+    { soundId: "b", name: "5 01 Piano Concerto Medley Dispel", playlistName: "Eustia", path: "Music/5-01 - Piano Concerto Medley -dispel-.mp3" },
+    { soundId: "c", name: "Warm Hearth", playlistName: "Town", path: "music/hearth.ogg", mood: "tavern" }
+  ];
+  const payload = {
+    module: "agentic-dj",
+    format: 1,
+    tracks: [
+      { foundryName: "1 01 Abgrund", file: "1-01 - Abgrund.mp3", mood: "horror", intensity: 3, tags: ["abyss"], useWhen: "Dread" },
+      { name: "5 01 Piano Concerto Medley Dispel", mood: "epic", intensity: 4, tags: ["piano"] }
+    ]
+  };
+  const parsed = parseCatalogJson(payload);
+  assert.equal(parsed.length, 2);
+  const applied = applyImportedTracks(catalog, JSON.stringify(payload));
+  assert.equal(applied.matched, 2);
+  assert.equal(applied.unmatched.length, 0);
+  assert.equal(applied.rows.find(row => row.soundId === "a").mood, "horror");
+  assert.equal(applied.rows.find(row => row.soundId === "b").mood, "epic");
+  assert.equal(applied.rows.find(row => row.soundId === "c").mood, "tavern");
+  const exported = exportCatalogJson(applied.rows);
+  assert.equal(exported.module, "agentic-dj");
+  assert.equal(exported.tracks.length, 3);
 });
 
 test("manual table rows serialize and match by soundId", async () => {
