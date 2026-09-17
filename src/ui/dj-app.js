@@ -1,4 +1,5 @@
-import { MODULE_ID } from "../constants.js";
+import { MODULE_ID, VERSION } from "../constants.js";
+import { t } from "../i18n.js";
 import { AgenticDjManualCatalog } from "./manual-catalog-app.js";
 import { AgenticDjSettings } from "./settings-app.js";
 
@@ -58,7 +59,7 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const ageMs = snap.situation.transcriptAgeMs;
     const transcriptAge = snap.situation.transcript
       ? (Number.isFinite(ageMs) ? game.i18n.format("AGENTICDJ.TranscriptAge", { seconds: Math.max(0, Math.round(ageMs / 1000)) }) : "")
-      : game.i18n.localize("AGENTICDJ.TranscriptLapsed");
+      : t("AGENTICDJ.TranscriptLapsed", "Speech lapsed");
     return {
       ...context,
       ...snap,
@@ -66,10 +67,20 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
       planning: snap.status === "planning" || snap.status === "analyzing",
       analyzing: snap.status === "analyzing",
       gmPrompt: snap.gmPrompt || "",
+      version: VERSION,
+      l: {
+        gmPrompt: t("AGENTICDJ.GmPrompt", "What is happening"),
+        gmPromptPlaceholder: t("AGENTICDJ.GmPromptPlaceholder", "Type the scene in any language, then Cue from this"),
+        gmPromptHint: t("AGENTICDJ.GmPromptHint", "Suggest now also reads this note. Ctrl+Enter cues immediately."),
+        gmPromptSubmit: t("AGENTICDJ.GmPromptSubmit", "Cue from this"),
+        suggesting: t("AGENTICDJ.Suggesting", "Suggesting…"),
+        catalogHomogeneous: t("AGENTICDJ.CatalogHomogeneous", "Catalog is almost all one mood:"),
+        catalogHomogeneousHint: t("AGENTICDJ.CatalogHomogeneousHint", "Load JSON in Manual list and Save tags.")
+      },
       hasCues: snap.proposal.cues.length > 0,
       hasLlmKey: Boolean(llmKey),
       llmKeyHint: game.settings.get(MODULE_ID, "llmApiKeyHint") || "",
-      transcript: snap.situation.transcript || game.i18n.localize("AGENTICDJ.TranscriptEmpty"),
+      transcript: snap.situation.transcript || t("AGENTICDJ.TranscriptEmpty", "No live transcript."),
       transcriptAge,
       playing: (snap.situation.playing ?? []).map(row => `${row.playlist}: ${row.tracks.join(", ")}`).join(" · ") || "Silent"
     };
@@ -82,7 +93,11 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onRender(context, options) {
     await super._onRender(context, options);
     const field = this.element.querySelector('[name="gmPrompt"]');
-    if (!field || field.dataset.bound) return;
+    if (!field) return;
+    if (this.orchestrator.gmPrompt && field.value !== this.orchestrator.gmPrompt) {
+      field.value = this.orchestrator.gmPrompt;
+    }
+    if (field.dataset.bound) return;
     field.dataset.bound = "1";
     field.addEventListener("input", event => {
       this.orchestrator.gmPrompt = event.target.value;
@@ -95,13 +110,19 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     });
   }
 
+  static readGmPrompt(app) {
+    const text = app.element?.querySelector?.('[name="gmPrompt"]')?.value;
+    if (text != null) app.orchestrator.gmPrompt = text;
+    return app.orchestrator.gmPrompt || "";
+  }
+
   static async onSuggest() {
+    AgenticDjApp.readGmPrompt(this);
     await this.orchestrator.suggestNow();
   }
 
   static async onPromptFromGm() {
-    const text = this.element.querySelector('[name="gmPrompt"]')?.value ?? this.orchestrator.gmPrompt ?? "";
-    this.orchestrator.gmPrompt = text;
+    const text = AgenticDjApp.readGmPrompt(this);
     await this.orchestrator.promptFromGm(text);
   }
 

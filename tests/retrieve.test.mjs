@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { inferWantedMood, retrieveTracks, scoreTrack, verifyCandidates } from "../src/rag/retrieve.js";
+import { inferWantedMood, retrieveTracks, resolveCatalogId, scoreTrack, verifyCandidates } from "../src/rag/retrieve.js";
 
 const tavern = {
   soundId: "a",
@@ -59,6 +59,17 @@ test("verifyCandidates rejects unknown ids", () => {
   const result = verifyCandidates([battle], ["missing", "b"], { inCombat: true }, {}, "combat", 5);
   assert.equal(result.kept.length, 1);
   assert.equal(result.dropped[0].soundId, "missing");
+});
+
+test("resolveCatalogId accepts track names from propose_cues", () => {
+  const catalog = [
+    { soundId: "TTeCwO1ruOzhfnic", name: "1 02 Asphodelus Short Ver" },
+    { soundId: "0NHZQ6qeQKb3OT8y", name: "1 12 Crossandra" }
+  ];
+  assert.equal(resolveCatalogId(catalog, "1 02 Asphodelus Short Ver"), "TTeCwO1ruOzhfnic");
+  assert.equal(resolveCatalogId(catalog, "TTeCwO1ruOzhfnic"), "TTeCwO1ruOzhfnic");
+  const verified = verifyCandidates(catalog, ["1 12 Crossandra"], { transcript: "walk" }, {}, "exploration", 3);
+  assert.equal(verified.kept[0].track.soundId, "0NHZQ6qeQKb3OT8y");
 });
 
 test("inferWantedMood reads tavern and combat language", () => {

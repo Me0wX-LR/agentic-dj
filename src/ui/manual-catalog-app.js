@@ -1,5 +1,6 @@
 import { MOODS, MODULE_ID } from "../constants.js";
 import { logInfo, logWarn } from "../debug/log.js";
+import { t } from "../i18n.js";
 import { listCatalog } from "../rag/catalog.js";
 import { parseTableDraft, serializeTableDraft, tableRowsFromCatalog, applyImportedTracks, exportCatalogJson } from "../rag/manual-catalog.js";
 
@@ -17,7 +18,15 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
       contentClasses: ["standard-form", "agentic-dj-config-content"]
     },
     position: { width: 980, height: 760 },
-    actions: {}
+    actions: {
+      fillEmpty: AgenticDjManualCatalog.onFillEmpty,
+      fillAnalyzed: AgenticDjManualCatalog.onFillAnalyzed,
+      applyJson: AgenticDjManualCatalog.onApplyJson,
+      exportJson: AgenticDjManualCatalog.onExportJson,
+      applyTags: AgenticDjManualCatalog.onSave,
+      saveLlm: AgenticDjManualCatalog.onSaveLlm,
+      saveSuggest: AgenticDjManualCatalog.onSaveSuggest
+    }
   };
 
   static PARTS = {
@@ -32,6 +41,7 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
     this.orchestrator = orchestrator;
     this.progress = "";
     this.situationNote = "";
+    this.jsonPaste = "";
     this.rows = null;
     this.busy = false;
     this._clickAbort = null;
@@ -54,8 +64,25 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
       ...context,
       rows: decorateRows(this.rows),
       situationNote: this.situationNote ?? "",
+      jsonPaste: this.jsonPaste ?? "",
       progress: this.progress || this.orchestrator.analysisProgress || "",
-      busy: this.busy
+      busy: this.busy,
+      l: {
+        hint: t("AGENTICDJ.Manual.Hint", "Load a catalog JSON, check moods, then Save tags."),
+        jsonFile: t("AGENTICDJ.Manual.JsonFile", "JSON file"),
+        jsonPaste: t("AGENTICDJ.Manual.JsonPaste", "Paste JSON"),
+        jsonPastePlaceholder: t("AGENTICDJ.Manual.JsonPastePlaceholder", "{ \"module\": \"agentic-dj\", \"tracks\": [] }"),
+        applyJson: t("AGENTICDJ.Manual.ApplyJson", "Apply JSON"),
+        exportJson: t("AGENTICDJ.Manual.ExportJson", "Download JSON"),
+        situation: t("AGENTICDJ.Manual.Situation", "Note for Save and suggest"),
+        situationPlaceholder: t("AGENTICDJ.Manual.SituationPlaceholder", "optional"),
+        situationHint: t("AGENTICDJ.Manual.SituationHint", "Leave blank unless you want Save and suggest to cue from this text."),
+        fillEmpty: t("AGENTICDJ.Manual.FillEmpty", "Blank rows"),
+        fillAnalyzed: t("AGENTICDJ.Manual.FillAnalyzed", "Reload catalog"),
+        save: t("AGENTICDJ.Manual.Save", "Save tags"),
+        saveLlm: t("AGENTICDJ.Manual.SaveLlm", "Fill blanks with LLM"),
+        saveSuggest: t("AGENTICDJ.Manual.ApplySuggest", "Save and suggest")
+      }
     };
   }
 
@@ -63,26 +90,6 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
     await super._onRender(context, options);
     this._clickAbort?.abort();
     this._clickAbort = new AbortController();
-    this.element.addEventListener("click", event => {
-      const button = event.target.closest("button[data-action]");
-      if (!button || !this.element.contains(button)) return;
-      const action = button.dataset.action;
-      const handler = {
-        fillEmpty: AgenticDjManualCatalog.onFillEmpty,
-        fillAnalyzed: AgenticDjManualCatalog.onFillAnalyzed,
-        importJson: AgenticDjManualCatalog.onImportJson,
-        pasteJson: AgenticDjManualCatalog.onPasteJson,
-        exportJson: AgenticDjManualCatalog.onExportJson,
-        applyTags: AgenticDjManualCatalog.onSave,
-        saveLlm: AgenticDjManualCatalog.onSaveLlm,
-        saveSuggest: AgenticDjManualCatalog.onSaveSuggest
-      }[action];
-      if (!handler) return;
-      event.preventDefault();
-      event.stopPropagation();
-      logInfo("manual.action", { action });
-      handler.call(this, event, button);
-    }, { signal: this._clickAbort.signal });
     const file = this.element.querySelector('input[name="importJson"]');
     file?.addEventListener("change", event => {
       const picked = event.target.files?.[0];
@@ -107,6 +114,7 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
     }));
     this.rows = rows;
     this.situationNote = this.element.querySelector('[name="situationNote"]')?.value?.trim?.() ?? "";
+    this.jsonPaste = this.element.querySelector('[name="jsonPaste"]')?.value ?? this.jsonPaste ?? "";
     return rows;
   }
 
@@ -148,8 +156,14 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
     this.render({ force: true });
   }
 
-  static onImportJson() {
-    this.element.querySelector('input[name="importJson"]')?.click();
+  static onApplyJson() {
+    this.readRowsFromDom();
+    const text = String(this.jsonPaste || "").trim();
+    if (!text) {
+      ui.notifications.warn(t("AGENTICDJ.Manual.JsonPaste", "Paste JSON above, or pick a JSON file."));
+      return;
+    }
+    AgenticDjManualCatalog.applyImport.call(this, text, "paste");
   }
 
   static async importFromFile(file) {
@@ -161,27 +175,12 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
     }
   }
 
-  static async onPasteJson() {
-    try {
-      const text = await foundry.applications.api.DialogV2.prompt({
-        window: { title: game.i18n.localize("AGENTICDJ.Manual.PasteJson") },
-        content: `<textarea name="json" rows="16" style="width:100%;font-family:ui-monospace,monospace"></textarea>`,
-        ok: {
-          label: game.i18n.localize("AGENTICDJ.Manual.ImportJson"),
-          callback: (_event, button) => button.form.querySelector('[name="json"]')?.value ?? ""
-        }
-      });
-      if (text) AgenticDjManualCatalog.applyImport.call(this, text, "paste");
-    } catch {
-      // dialog cancelled
-    }
-  }
-
   static applyImport(text, source = "json") {
     try {
       const catalog = listCatalog();
       const { rows, matched, unmatched, scanned } = applyImportedTracks(catalog, text);
       this.rows = rows;
+      this.jsonPaste = "";
       this.persistDraft(rows);
       logInfo("manual.import", { source, scanned, matched, unmatched: unmatched.length });
       if (!matched) {
@@ -189,6 +188,7 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
           scanned,
           sample: unmatched[0] || catalog[0]?.name || ""
         }));
+        this.render({ force: true });
         return;
       }
       const extra = unmatched.length

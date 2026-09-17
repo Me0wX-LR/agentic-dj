@@ -1,7 +1,7 @@
 import { DIRECTOR_TOOLS } from "../constants.js";
 import { logInfo, logWarn } from "../debug/log.js";
 import { listCatalog } from "../rag/catalog.js";
-import { catalogMoodCounts, inferWantedIntensity, inferWantedMood, retrieveTracks, verifyCandidates } from "../rag/retrieve.js";
+import { catalogMoodCounts, inferWantedIntensity, inferWantedMood, resolveCatalogId, retrieveTracks, verifyCandidates } from "../rag/retrieve.js";
 import { hasLlmKey, setting } from "../settings.js";
 import { chatComplete, extraSystem, parseJsonContent } from "../tools/llm.js";
 
@@ -175,14 +175,17 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
 
     const verified = verifyCandidates(
       catalog,
-      proposal.cues.map(cue => cue.soundId),
+      proposal.cues.map(cue => resolveCatalogId(catalog, cue.soundId) || cue.soundId),
       live(),
       this.memory.snapshot(),
       inferWantedMood(live()),
       live().intensity
     );
     const cues = verified.kept.slice(0, Number(setting("maxProposals") || 3)).map(row => {
-      const llmWhy = proposal.cues.find(cue => cue.soundId === row.track.soundId)?.why;
+      const llmWhy = proposal.cues.find(cue => {
+        const id = resolveCatalogId(catalog, cue.soundId) || cue.soundId;
+        return id === row.track.soundId;
+      })?.why;
       return {
         soundId: row.track.soundId,
         name: row.track.name,

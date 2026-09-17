@@ -1,12 +1,34 @@
 <div class="agentic-dj-manual">
   <div class="standard-form flexcol agentic-dj-settings">
-    <p class="notes">{{localize "AGENTICDJ.Manual.Hint"}}</p>
+    <p class="notes">{{l.hint}}</p>
     <p class="agentic-dj-progress">{{progress}}</p>
 
+    <fieldset class="agentic-dj-fieldset">
+      <legend>{{l.jsonFile}}</legend>
+      <div class="form-group">
+        <label>{{l.jsonFile}}</label>
+        <input type="file" name="importJson" accept="application/json,.json" />
+      </div>
+      <div class="form-group">
+        <label>{{l.jsonPaste}}</label>
+        <textarea name="jsonPaste" rows="6" placeholder="{{l.jsonPastePlaceholder}}">{{jsonPaste}}</textarea>
+      </div>
+      <p class="flexrow agentic-dj-json-actions">
+        <button type="button" data-action="applyJson">
+          <i class="fa-solid fa-file-import"></i>
+          <span>{{l.applyJson}}</span>
+        </button>
+        <button type="button" data-action="exportJson">
+          <i class="fa-solid fa-file-export"></i>
+          <span>{{l.exportJson}}</span>
+        </button>
+      </p>
+    </fieldset>
+
     <div class="form-group">
-      <label>{{localize "AGENTICDJ.Manual.Situation"}}</label>
-      <input type="text" name="situationNote" value="{{situationNote}}" placeholder="{{localize 'AGENTICDJ.Manual.SituationPlaceholder'}}" />
-      <p class="hint">{{localize "AGENTICDJ.Manual.SituationHint"}}</p>
+      <label>{{l.situation}}</label>
+      <input type="text" name="situationNote" value="{{situationNote}}" placeholder="{{l.situationPlaceholder}}" />
+      <p class="hint">{{l.situationHint}}</p>
     </div>
 
     <div class="agentic-dj-table-wrap">
@@ -47,17 +69,28 @@
     {{#unless rows.length}}
       <p>{{localize "AGENTICDJ.NoTracks"}}</p>
     {{/unless}}
-    <input type="file" name="importJson" accept="application/json,.json" hidden />
   </div>
 
   <footer class="form-footer agentic-dj-manual-footer">
-    <button type="button" data-action="importJson" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-file-import"></i> {{localize "AGENTICDJ.Manual.ImportJson"}}</button>
-    <button type="button" data-action="pasteJson" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-clipboard"></i> {{localize "AGENTICDJ.Manual.PasteJson"}}</button>
-    <button type="button" data-action="exportJson" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-file-export"></i> {{localize "AGENTICDJ.Manual.ExportJson"}}</button>
-    <button type="button" data-action="fillEmpty" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-file"></i> {{localize "AGENTICDJ.Manual.FillEmpty"}}</button>
-    <button type="button" data-action="fillAnalyzed" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.Manual.FillAnalyzed"}}</button>
-    <button type="button" data-action="applyTags" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-floppy-disk"></i> {{localize "AGENTICDJ.Manual.Save"}}</button>
-    <button type="button" data-action="saveLlm" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.Manual.SaveLlm"}}</button>
-    <button type="button" data-action="saveSuggest" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-play"></i> {{localize "AGENTICDJ.Manual.ApplySuggest"}}</button>
+    <button type="button" data-action="fillEmpty" {{#if busy}}disabled{{/if}}>
+      <i class="fa-solid fa-file"></i>
+      <span>{{l.fillEmpty}}</span>
+    </button>
+    <button type="button" data-action="fillAnalyzed" {{#if busy}}disabled{{/if}}>
+      <i class="fa-solid fa-tags"></i>
+      <span>{{l.fillAnalyzed}}</span>
+    </button>
+    <button type="button" data-action="applyTags" {{#if busy}}disabled{{/if}}>
+      <i class="fa-solid fa-floppy-disk"></i>
+      <span>{{l.save}}</span>
+    </button>
+    <button type="button" data-action="saveLlm" {{#if busy}}disabled{{/if}}>
+      <i class="fa-solid fa-wand-magic-sparkles"></i>
+      <span>{{l.saveLlm}}</span>
+    </button>
+    <button type="button" data-action="saveSuggest" {{#if busy}}disabled{{/if}}>
+      <i class="fa-solid fa-play"></i>
+      <span>{{l.saveSuggest}}</span>
+    </button>
   </footer>
 </div>

@@ -1,4 +1,5 @@
-import { MODULE_ID } from "./constants.js";
+import { MODULE_ID, VERSION } from "./constants.js";
+import { reloadEnglishFile } from "./i18n.js";
 import { Orchestrator } from "./agents/orchestrator.js";
 import {
   copyLogDump,
@@ -15,10 +16,15 @@ import { AgenticDjApp } from "./ui/dj-app.js";
 
 Hooks.once("init", () => {
   registerSettings();
-  logInfo("module.init", { version: game.modules.get(MODULE_ID)?.version });
+  logInfo("module.init", { version: VERSION, moduleJson: game.modules.get(MODULE_ID)?.version });
 });
 
-Hooks.once("ready", () => {
+Hooks.once("i18nInit", () => {
+  void reloadEnglishFile();
+});
+
+Hooks.once("ready", async () => {
+  await reloadEnglishFile();
   if (!game.user.isGM) {
     logInfo("module.ready.skip", { reason: "not-gm" });
     return;
@@ -41,7 +47,8 @@ Hooks.once("ready", () => {
   game.modules.get(MODULE_ID).api = api;
   globalThis.agenticDj = api;
   logInfo("module.ready", {
-    version: game.modules.get(MODULE_ID)?.version,
+    version: VERSION,
+    moduleJson: game.modules.get(MODULE_ID)?.version,
     world: game.world?.id,
     catalog: catalogStats(),
     llm: publicLlmConfig()

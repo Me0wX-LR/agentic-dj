@@ -2,18 +2,32 @@
   <header class="agentic-dj-toolbar">
     <button type="button" data-action="listen" class="{{#if listening}}active{{/if}}">
       <i class="fa-solid fa-microphone"></i>
-      {{#if listening}}{{localize "AGENTICDJ.Listening"}}{{else}}{{localize "AGENTICDJ.Listen"}}{{/if}}
+      <span>{{#if listening}}{{localize "AGENTICDJ.Listening"}}{{else}}{{localize "AGENTICDJ.Listen"}}{{/if}}</span>
     </button>
     <button type="button" data-action="suggest">
       <i class="fa-solid fa-wand-magic-sparkles"></i>
-      {{#if planning}}{{localize "AGENTICDJ.Suggesting"}}{{else}}{{localize "AGENTICDJ.SuggestNow"}}{{/if}}
+      <span>{{#if planning}}{{l.suggesting}}{{else}}{{localize "AGENTICDJ.SuggestNow"}}{{/if}}</span>
     </button>
-    <button type="button" data-action="analyze" {{#if analyzing}}disabled{{/if}}><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.AnalyzeLibrary"}}</button>
-    <button type="button" data-action="openManual"><i class="fa-solid fa-table"></i> {{localize "AGENTICDJ.Manual.Button"}}</button>
-    <button type="button" data-action="stop"><i class="fa-solid fa-stop"></i> {{localize "AGENTICDJ.StopMusic"}}</button>
-    <button type="button" data-action="openSettings"><i class="fa-solid fa-key"></i> {{localize "AGENTICDJ.SettingsMenuLabel"}}</button>
+    <button type="button" data-action="analyze" {{#if analyzing}}disabled{{/if}}>
+      <i class="fa-solid fa-tags"></i>
+      <span>{{localize "AGENTICDJ.AnalyzeLibrary"}}</span>
+    </button>
+    <button type="button" data-action="openManual">
+      <i class="fa-solid fa-table"></i>
+      <span>{{localize "AGENTICDJ.Manual.Button"}}</span>
+    </button>
+    <button type="button" data-action="stop">
+      <i class="fa-solid fa-stop"></i>
+      <span>{{localize "AGENTICDJ.StopMusic"}}</span>
+    </button>
+    <button type="button" data-action="openSettings">
+      <i class="fa-solid fa-key"></i>
+      <span>{{localize "AGENTICDJ.SettingsMenuLabel"}}</span>
+    </button>
   </header>
   <p class="agentic-dj-keystatus">
+    v{{version}}
+    ·
     {{#if hasLlmKey}}{{localize "AGENTICDJ.Settings.KeySaved"}} {{llmKeyHint}}{{else}}{{localize "AGENTICDJ.NeedsKey"}}{{/if}}
   </p>
 
@@ -23,12 +37,17 @@
       <p class="agentic-dj-meta">{{statusLabel}} · {{situation.sceneName}} · {{situation.mood}} {{situation.intensity}}/5 · {{#if situation.inCombat}}Combat r{{situation.round}}{{else}}Out of combat{{/if}}</p>
       <p>{{transcript}}</p>
       <p class="agentic-dj-meta">{{transcriptAge}} · Now: {{playing}}</p>
-      <label class="agentic-dj-gmnote-label">{{localize "AGENTICDJ.GmPrompt"}}</label>
-      <textarea name="gmPrompt" rows="3" placeholder="{{localize 'AGENTICDJ.GmPromptPlaceholder'}}">{{gmPrompt}}</textarea>
-      <p class="agentic-dj-meta">{{localize "AGENTICDJ.GmPromptHint"}}</p>
-      <p class="flexrow" style="gap:0.35rem;">
-        <button type="button" data-action="promptFromGm"><i class="fa-solid fa-keyboard"></i> {{localize "AGENTICDJ.GmPromptSubmit"}}</button>
-        <button type="button" data-action="clearTranscript">{{localize "AGENTICDJ.ClearTranscript"}}</button>
+      <label class="agentic-dj-gmnote-label" for="agentic-dj-gm-prompt">{{l.gmPrompt}}</label>
+      <textarea id="agentic-dj-gm-prompt" name="gmPrompt" rows="3" placeholder="{{l.gmPromptPlaceholder}}">{{gmPrompt}}</textarea>
+      <p class="agentic-dj-meta">{{l.gmPromptHint}}</p>
+      <p class="flexrow agentic-dj-gmnote-actions">
+        <button type="button" data-action="promptFromGm">
+          <i class="fa-solid fa-keyboard"></i>
+          <span>{{l.gmPromptSubmit}}</span>
+        </button>
+        <button type="button" data-action="clearTranscript">
+          <span>{{localize "AGENTICDJ.ClearTranscript"}}</span>
+        </button>
       </p>
     </section>
 
@@ -47,10 +66,10 @@
           <p>{{cue.why}}</p>
           <p class="agentic-dj-tags">{{#each cue.tags}}<span>{{this}}</span>{{/each}}</p>
           <footer>
-            <button type="button" data-action="play" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Play"}}</button>
-            <button type="button" data-action="preview" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Preview"}}</button>
-            <button type="button" data-action="skip" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Skip"}}</button>
-            <button type="button" data-action="ban" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Ban"}}</button>
+            <button type="button" data-action="play" data-sound-id="{{cue.soundId}}"><span>{{localize "AGENTICDJ.Play"}}</span></button>
+            <button type="button" data-action="preview" data-sound-id="{{cue.soundId}}"><span>{{localize "AGENTICDJ.Preview"}}</span></button>
+            <button type="button" data-action="skip" data-sound-id="{{cue.soundId}}"><span>{{localize "AGENTICDJ.Skip"}}</span></button>
+            <button type="button" data-action="ban" data-sound-id="{{cue.soundId}}"><span>{{localize "AGENTICDJ.Ban"}}</span></button>
           </footer>
         </article>
       {{/each}}
@@ -61,7 +80,7 @@
         <h3>{{localize "AGENTICDJ.Catalog"}}</h3>
         <p>{{catalog.analyzed}} / {{catalog.total}} analyzed</p>
         {{#if catalog.homogeneous}}
-          <p class="agentic-dj-warn">{{localize "AGENTICDJ.CatalogHomogeneous"}} {{catalog.dominantCount}}/{{catalog.analyzed}} {{catalog.dominantMood}}. {{localize "AGENTICDJ.CatalogHomogeneousHint"}}</p>
+          <p class="agentic-dj-warn">{{l.catalogHomogeneous}} {{catalog.dominantCount}}/{{catalog.analyzed}} {{catalog.dominantMood}}. {{l.catalogHomogeneousHint}}</p>
         {{/if}}
       {{#if analysisProgress}}<p class="agentic-dj-progress">{{analysisProgress}}</p>{{/if}}
       </div>
@@ -70,12 +89,12 @@
         <p>Played {{memory.recentIds.length}} · Skipped {{memory.skippedIds.length}} · Banned {{memory.bannedIds.length}}</p>
         <p class="agentic-dj-meta">{{memoryPath}}</p>
         <p class="flexrow" style="gap:0.35rem;">
-          <button type="button" data-action="openMemory">{{localize "AGENTICDJ.OpenMemory"}}</button>
-          <button type="button" data-action="forgetMemory">{{localize "AGENTICDJ.ForgetMemory"}}</button>
+          <button type="button" data-action="openMemory"><span>{{localize "AGENTICDJ.OpenMemory"}}</span></button>
+          <button type="button" data-action="forgetMemory"><span>{{localize "AGENTICDJ.ForgetMemory"}}</span></button>
         </p>
         <p class="flexrow" style="gap:0.35rem;">
-          <button type="button" data-action="copyLogs">{{localize "AGENTICDJ.CopyLogs"}}</button>
-          <button type="button" data-action="openLogs">{{localize "AGENTICDJ.OpenLogs"}}</button>
+          <button type="button" data-action="copyLogs"><span>{{localize "AGENTICDJ.CopyLogs"}}</span></button>
+          <button type="button" data-action="openLogs"><span>{{localize "AGENTICDJ.OpenLogs"}}</span></button>
         </p>
       </div>
     </section>

@@ -1,4 +1,5 @@
 export const MODULE_ID = "agentic-dj";
+export const VERSION = "0.1.12";
 export const FLAG_SCOPE = "agentic-dj";
 export const FLAG_CARD = "card";
 

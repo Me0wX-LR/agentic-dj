@@ -1,5 +1,6 @@
 import { MODULE_ID } from "../constants.js";
 import { logError, logInfo } from "../debug/log.js";
+import { t } from "../i18n.js";
 import { catalogStats } from "../rag/catalog.js";
 import { SessionMemory, memoryPath, moodFromSituation } from "../memory/session.js";
 import { mergeUtterance } from "../memory/transcript.js";
@@ -208,6 +209,7 @@ export class Orchestrator {
     this.status = "planning";
     this.lastSuggestAt = Date.now();
     this.refreshUi();
+    this.#applyGmPrompt();
     this.situation = this.listener.brief();
     logInfo("orchestrator.suggest", {
       recoverFrom,
@@ -252,18 +254,26 @@ export class Orchestrator {
     }
   }
 
+  #applyGmPrompt() {
+    const clean = String(this.gmPrompt || "").trim();
+    if (!clean) return;
+    this.listener.transcript = mergeUtterance(this.listener.transcript, clean, "manual");
+  }
+
   async promptFromGm(text) {
     const clean = String(text || "").trim();
-    if (clean) {
-      this.gmPrompt = clean;
-      this.listener.transcript = mergeUtterance(this.listener.transcript, clean, "manual");
-      this.situation = this.listener.brief();
-      logInfo("orchestrator.gmPrompt", {
-        chars: clean.length,
-        mood: this.situation.mood,
-        preview: clean.slice(0, 160)
-      });
+    this.gmPrompt = clean;
+    if (!clean) {
+      ui.notifications.warn(t("AGENTICDJ.GmPromptEmpty", "Type what is happening first."));
+      return this.proposal;
     }
+    this.#applyGmPrompt();
+    this.situation = this.listener.brief();
+    logInfo("orchestrator.gmPrompt", {
+      chars: clean.length,
+      mood: this.situation.mood,
+      preview: clean.slice(0, 160)
+    });
     return this.suggestNow();
   }
 

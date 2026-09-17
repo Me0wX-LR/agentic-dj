@@ -48,8 +48,8 @@
 }
 
 .agentic-dj-manual-footer {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   gap: 0.4rem;
   flex: 0 0 auto;
   position: relative;
@@ -61,8 +61,41 @@
   border-top: 1px solid var(--color-border-light-tertiary, #555);
 }
 
-.agentic-dj-manual-footer button {
+.agentic-dj-manual-footer button,
+.agentic-dj-json-actions button,
+.agentic-dj-gmnote-actions button,
+.agentic-dj-toolbar button {
   pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.agentic-dj-manual-footer button span,
+.agentic-dj-json-actions button span,
+.agentic-dj-toolbar button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agentic-dj-json-actions,
+.agentic-dj-gmnote-actions {
+  gap: 0.35rem;
+  margin: 0.35rem 0 0;
+}
+
+.agentic-dj-settings textarea[name="jsonPaste"] {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.8rem;
+  min-height: 7rem;
+  width: 100%;
+  resize: vertical;
+}
+
+.agentic-dj-settings input[type="file"] {
+  width: 100%;
 }
 
 .agentic-dj-app {

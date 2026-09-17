@@ -70,6 +70,17 @@ export function resolveSearchMood(requested, inferred) {
   return requested;
 }
 
+/** LLM propose_cues often returns track names instead of Foundry soundIds. */
+export function resolveCatalogId(catalog = [], id = "") {
+  const raw = String(id || "").trim();
+  if (!raw) return "";
+  const byId = catalog.find(track => track.soundId === raw);
+  if (byId) return byId.soundId;
+  const loose = raw.toLowerCase().replace(/[_./\\]+/g, " ").replace(/\s+/g, " ").trim();
+  const hit = catalog.find(track => String(track.name || "").toLowerCase().replace(/\s+/g, " ").trim() === loose);
+  return hit?.soundId || "";
+}
+
 export function scoreTrack(track, situation, memory = {}) {
   const banned = new Set(memory.bannedIds ?? []);
   const skipped = new Set(memory.skippedIds ?? []);
@@ -203,7 +214,8 @@ export function verifyCandidates(catalog, soundIds, situation, memory, intendedM
     intensity: intendedIntensity || inferWantedIntensity({ ...situation, wantedMood })
   };
   for (const id of soundIds) {
-    const track = byId.get(id);
+    const resolved = resolveCatalogId(catalog, id) || id;
+    const track = byId.get(resolved);
     if (!track) {
       dropped.push({ soundId: id, reason: "not in catalog" });
       continue;
