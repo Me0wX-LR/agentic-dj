@@ -1,4 +1,4 @@
-import { DEFAULTS, LLM_PRESETS, MODULE_ID, STT_PRESETS } from "./constants.js";
+import { DEFAULTS, LLM_PRESETS, MODULE_ID, STT_PRESETS, normalizeLlmBaseUrl } from "./constants.js";
 import { AgenticDjSettings } from "./ui/settings-app.js";
 
 export function setting(key) {
@@ -48,7 +48,7 @@ export function llmConfig() {
   const preset = LLM_PRESETS[provider] ?? LLM_PRESETS.custom;
   return {
     provider,
-    baseUrl: (setting("llmBaseUrl") || preset.baseUrl || "").replace(/\/$/, ""),
+    baseUrl: normalizeLlmBaseUrl(setting("llmBaseUrl") || preset.baseUrl || ""),
     model: setting("llmModel") || preset.model,
     apiKey: setting("llmApiKey") || "",
     extraInstructions: setting("extraInstructions") || "",

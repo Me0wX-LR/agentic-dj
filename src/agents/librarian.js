@@ -1,34 +1,40 @@
 import { MODULE_ID, MOODS } from "../constants.js";
-import { listCatalog, writeCard } from "../rag/catalog.js";
+import { findSound, listCatalog, writeCard } from "../rag/catalog.js";
 import { hasLlmKey } from "../settings.js";
 import { analyzeSoundFile } from "../tools/audio-analyze.js";
 import { chatJson, extraSystem } from "../tools/llm.js";
 
 export class Librarian {
-  constructor() {
-    this.queue = [];
-    this.busy = false;
-  }
-
   async analyzeAll({ force = false } = {}) {
     const tracks = listCatalog().filter(track => force || !track.analyzedAt);
     const results = [];
+    const failures = [];
     for (const track of tracks) {
       try {
         results.push(await this.analyzeTrack(track.soundId));
       } catch (err) {
         console.warn(`${MODULE_ID} | analyze failed for ${track.name}`, err);
+        failures.push({ name: track.name, error: err.message || String(err) });
       }
     }
-    return results;
+    return { results, failures, scanned: tracks.length, catalogSize: listCatalog().length };
   }
 
   async analyzeTrack(soundId) {
     const catalog = listCatalog();
     const track = catalog.find(row => row.soundId === soundId);
     if (!track) throw new Error("Track not found");
-    const found = [...game.playlists].flatMap(p => [...p.sounds].map(sound => ({ playlist: p, sound }))).find(row => row.sound.id === soundId);
-    const features = await analyzeSoundFile(track.path);
+    const found = findSound(soundId);
+    if (!found?.sound) throw new Error(`Playlist sound ${track.name} is missing`);
+
+    let features = null;
+    try {
+      features = await analyzeSoundFile(track.path);
+    } catch (err) {
+      console.warn(`${MODULE_ID} | audio decode failed for ${track.name}, using filename tags`, err);
+      features = filenameFeatures(track.name, track.path, err.message);
+    }
+
     const filenameTags = filenameHints(track.name, track.path);
     let card = {
       tags: [...new Set([...(features.tags ?? []), ...filenameTags])],
@@ -75,6 +81,29 @@ export class Librarian {
     }
     return writeCard(found.sound, card);
   }
+}
+
+function filenameFeatures(name, path, reason) {
+  const tags = filenameHints(name, path);
+  const mood = tags.includes("combat") || tags.includes("battle")
+    ? "combat"
+    : tags.includes("tavern") || tags.includes("inn")
+      ? "tavern"
+      : tags.includes("horror") || tags.includes("dark")
+        ? "horror"
+        : tags.includes("ambient")
+          ? "ambient"
+          : "exploration";
+  return {
+    backend: "filename",
+    duration: 0,
+    tempo: 100,
+    energy: mood === "combat" ? 0.5 : 0.1,
+    mood,
+    intensity: mood === "combat" ? 5 : 3,
+    tags,
+    decodeError: reason || "decode failed"
+  };
 }
 
 function filenameHints(name, path) {

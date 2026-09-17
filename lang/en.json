@@ -22,6 +22,8 @@
     "NoTracks": "No playlist sounds found. Add music in the Playlists directory first.",
     "Analyzing": "Librarian is analyzing audio…",
     "Analyzed": "Analyzed {count} tracks",
+    "AnalyzedNone": "Analyzed 0 of {scanned} tracks.{error} Add audio files to Foundry Playlists (not YouTube-only queues). ChatAnywhere base URL must include /v1",
+    "AnalyzedPartial": "Analyzed {count} tracks ({failed} failed). Check the F12 console for paths that could not decode.",
     "NeedsKey": "No LLM key configured. Local audio tags still work; richer cards need a BYOK model.",
     "PlayConfirm": "Play this cue for the table?",
     "Rejected": "Skipped. Director is recovering…",

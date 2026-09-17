@@ -9,7 +9,8 @@ import { extractFeatures } from "./audio-features.js";
 export { extractFeatures } from "./audio-features.js";
 
 export async function analyzeSoundFile(path) {
-  const url = foundry.utils.getRoute(path);
+  if (!path) throw new Error("Sound has no file path");
+  const url = /^https?:/i.test(path) ? path : foundry.utils.getRoute(path);
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Could not fetch audio ${path}`);
   const buffer = await response.arrayBuffer();
@@ -17,8 +18,9 @@ export async function analyzeSoundFile(path) {
 }
 
 export async function analyzeArrayBuffer(arrayBuffer) {
+  const forWorker = arrayBuffer.slice(0);
   try {
-    return await analyzeInWorker(arrayBuffer);
+    return await analyzeInWorker(forWorker);
   } catch (err) {
     console.warn("agentic-dj | worker analysis failed, using main-thread fallback", err);
     return analyzeOnMainThread(arrayBuffer);
@@ -43,7 +45,7 @@ function analyzeInWorker(arrayBuffer) {
       worker.terminate();
       reject(event.error ?? new Error(event.message));
     };
-    worker.postMessage({ arrayBuffer }, [arrayBuffer]);
+    worker.postMessage({ arrayBuffer });
   });
 }
 

@@ -1,4 +1,4 @@
-import { DEFAULTS, LLM_PRESETS, MODULE_ID, STT_PRESETS } from "../constants.js";
+import { DEFAULTS, LLM_PRESETS, MODULE_ID, STT_PRESETS, normalizeLlmBaseUrl } from "../constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -136,7 +136,7 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
     const maxProposals = Number(readValue(root, "maxProposals") || DEFAULTS.maxProposals);
 
     await game.settings.set(MODULE_ID, "llmProvider", readValue(root, "llmProvider") || DEFAULTS.llmProvider);
-    await game.settings.set(MODULE_ID, "llmBaseUrl", readValue(root, "llmBaseUrl") || DEFAULTS.llmBaseUrl);
+    await game.settings.set(MODULE_ID, "llmBaseUrl", normalizeLlmBaseUrl(readValue(root, "llmBaseUrl") || DEFAULTS.llmBaseUrl));
     await game.settings.set(MODULE_ID, "llmModel", readValue(root, "llmModel") || DEFAULTS.llmModel);
     await game.settings.set(MODULE_ID, "sttProvider", readValue(root, "sttProvider") || DEFAULTS.sttProvider);
     await game.settings.set(MODULE_ID, "sttBaseUrl", readValue(root, "sttBaseUrl"));

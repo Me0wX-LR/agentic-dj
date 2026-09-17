@@ -22,6 +22,14 @@ export const DEFAULTS = {
   maxProposals: 3
 };
 
+/** OpenAI-compatible hosts must end in /v1. ChatAnywhere users often paste the host only. */
+export function normalizeLlmBaseUrl(url) {
+  let value = String(url || "").trim().replace(/\/+$/, "");
+  if (!value) return "";
+  if (!/\/v\d+$/i.test(value)) value += "/v1";
+  return value;
+}
+
 export const LLM_PRESETS = {
   openrouter: {
     label: "OpenRouter",
@@ -36,6 +44,11 @@ export const LLM_PRESETS = {
   openai: {
     label: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
+    model: "gpt-4o-mini"
+  },
+  chatanywhere: {
+    label: "ChatAnywhere",
+    baseUrl: "https://api.chatanywhere.org/v1",
     model: "gpt-4o-mini"
   },
   ollama: {

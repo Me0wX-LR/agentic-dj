@@ -128,6 +128,7 @@ If a field is blank on save, we write the default, not `0`. `0` temperature is v
 | --- | --- | --- |
 | OpenRouter | `https://openrouter.ai/api/v1` | Default. Best CORS from a Foundry tab |
 | Groq | `https://api.groq.com/openai/v1` | Fast, cheap |
+| ChatAnywhere | `https://api.chatanywhere.org/v1` | Host-only URLs are auto-suffixed with `/v1` |
 | OpenAI | `https://api.openai.com/v1` | Often blocked by browser CORS |
 | Ollama | `http://localhost:11434/v1` | Enable CORS on Ollama |
 | Custom | any `/v1` | LM Studio, vLLM, LiteLLM |

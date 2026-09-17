@@ -30,10 +30,18 @@ export function cardFromSound(playlist, sound) {
   };
 }
 
+export function playlistDocuments() {
+  return game.playlists?.contents ?? [];
+}
+
+export function soundDocuments(playlist) {
+  return playlist?.sounds?.contents ?? [];
+}
+
 export function listCatalog() {
   const catalog = [];
-  for (const playlist of game.playlists ?? []) {
-    for (const sound of playlist.sounds ?? []) {
+  for (const playlist of playlistDocuments()) {
+    for (const sound of soundDocuments(playlist)) {
       catalog.push(cardFromSound(playlist, sound));
     }
   }
@@ -41,7 +49,7 @@ export function listCatalog() {
 }
 
 export function findSound(soundId) {
-  for (const playlist of game.playlists ?? []) {
+  for (const playlist of playlistDocuments()) {
     const sound = playlist.sounds.get(soundId);
     if (sound) return { playlist, sound };
   }

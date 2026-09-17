@@ -80,6 +80,12 @@ test("learned likes boost a track in that mood", () => {
   assert.ok(ranked.find(row => row.track.soundId === "c").score > scoreTrack(drone, situation, {}).score);
 });
 
+test("ChatAnywhere host-only URLs get /v1", async () => {
+  const { normalizeLlmBaseUrl } = await import("../src/constants.js");
+  assert.equal(normalizeLlmBaseUrl("https://api.chatanywhere.org"), "https://api.chatanywhere.org/v1");
+  assert.equal(normalizeLlmBaseUrl("https://api.chatanywhere.org/v1/"), "https://api.chatanywhere.org/v1");
+});
+
 test("shipped defaults match the documented DJ sampling", async () => {
   const { DEFAULTS } = await import("../src/constants.js");
   assert.equal(DEFAULTS.llmTemperature, 0.4);

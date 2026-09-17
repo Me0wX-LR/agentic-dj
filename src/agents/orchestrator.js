@@ -48,9 +48,21 @@ export class Orchestrator {
     this.status = "analyzing";
     this.refreshUi();
     try {
-      const results = await this.librarian.analyzeAll({ force });
+      const { results, failures, scanned, catalogSize } = await this.librarian.analyzeAll({ force });
       this.status = "idle";
-      ui.notifications.info(game.i18n.format("AGENTICDJ.Analyzed", { count: results.length }));
+      if (!catalogSize) {
+        ui.notifications.warn(game.i18n.localize("AGENTICDJ.NoTracks"));
+      } else if (!results.length) {
+        const first = failures[0]?.error ? ` ${failures[0].error}` : "";
+        ui.notifications.error(game.i18n.format("AGENTICDJ.AnalyzedNone", { scanned, error: first }));
+      } else if (failures.length) {
+        ui.notifications.warn(game.i18n.format("AGENTICDJ.AnalyzedPartial", {
+          count: results.length,
+          failed: failures.length
+        }));
+      } else {
+        ui.notifications.info(game.i18n.format("AGENTICDJ.Analyzed", { count: results.length }));
+      }
       return results;
     } catch (err) {
       this.status = "error";

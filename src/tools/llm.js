@@ -49,8 +49,14 @@ export async function chatJson(messages, schemaHint = "") {
     ...cloned[cloned.length - 1],
     content: `${cloned[cloned.length - 1].content}${extra}`
   };
-  const message = await chatComplete({ messages: cloned, json: true, tools: undefined });
-  return parseJsonContent(message.content);
+  try {
+    const message = await chatComplete({ messages: cloned, json: true, tools: undefined });
+    return parseJsonContent(message.content);
+  } catch (err) {
+    console.warn(`${MODULE_ID} | JSON mode unsupported, retrying plain chat`, err);
+    const message = await chatComplete({ messages: cloned, json: false, tools: undefined });
+    return parseJsonContent(message.content);
+  }
 }
 
 export function parseJsonContent(content) {
