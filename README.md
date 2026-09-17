@@ -146,8 +146,8 @@ No key: local tags + ranker still run. Key: Librarian cards + Director tools.
 ## 5-minute demo
 
 1. Add four mixed playlist tracks.
-2. **Analyze library**.
-3. Tavern scene → **Suggest now** (no autoplay).
+2. **Manual list** → Load playlist names → fill any moods you know → **Tag and suggest**.
+3. Or **Analyze library** for small collections (audio decode). Large libraries skip auto-analyze so Foundry does not freeze.
 4. **Listen** or start combat: “guards kick the door, roll initiative.”
 5. **Skip** one cue → recovery uses memory.
 6. **Play** → Foundry playlist plays for everyone; `memory.md` updates.
@@ -161,6 +161,23 @@ FoundryVTT/Data/worlds/<world>/agentic-dj/memory.md
 ```
 
 Open or wipe from the DJ panel.
+
+## Engineer logs
+
+Every analyze, LLM call, catalog scan, and GM Play/Skip is written to the F12 console with the prefix `[agentic-dj]`. API keys are redacted. The same ring buffer is also saved to:
+
+```
+FoundryVTT/Data/worlds/<world>/agentic-dj/debug.log
+```
+
+From the DJ panel use **Copy engineer log** / **Open debug.log**, or in the console:
+
+```js
+agenticDj.copyLogs()
+agenticDj.dumpLogs()
+```
+
+Paste that dump when reviewing ChatAnywhere or “0 tracks” failures.
 
 ## Optional
 

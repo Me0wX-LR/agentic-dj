@@ -66,6 +66,20 @@ export function catalogStats() {
   };
 }
 
+export function catalogInventory() {
+  return playlistDocuments().map(playlist => ({
+    id: playlist.id,
+    name: playlist.name,
+    mode: playlist.mode,
+    sounds: soundDocuments(playlist).map(sound => ({
+      id: sound.id,
+      name: sound.name,
+      path: sound.path || "",
+      analyzed: Boolean(sound.getFlag?.(FLAG_SCOPE, FLAG_CARD) ?? sound.flags?.[FLAG_SCOPE]?.[FLAG_CARD])
+    }))
+  }));
+}
+
 export async function writeCard(sound, card) {
   const payload = {
     ...card,

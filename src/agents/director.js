@@ -1,4 +1,5 @@
-import { DIRECTOR_TOOLS, MODULE_ID } from "../constants.js";
+import { DIRECTOR_TOOLS } from "../constants.js";
+import { logInfo, logWarn } from "../debug/log.js";
 import { listCatalog } from "../rag/catalog.js";
 import { inferWantedMood, retrieveTracks, verifyCandidates } from "../rag/retrieve.js";
 import { hasLlmKey, setting } from "../settings.js";
@@ -12,11 +13,22 @@ export class Director {
   async plan(situation, { recoverFrom = null } = {}) {
     const catalog = listCatalog().filter(track => track.features || track.mood);
     const local = this.localPlan(situation, catalog);
-    if (!hasLlmKey() || catalog.length === 0) return local;
+    logInfo("director.plan.start", {
+      catalogWithCards: catalog.length,
+      hasLlm: hasLlmKey(),
+      recoverFrom,
+      mood: inferWantedMood(situation)
+    });
+    if (!hasLlmKey() || catalog.length === 0) {
+      logInfo("director.plan.local", { reason: !hasLlmKey() ? "no-llm-key" : "empty-catalog", cueCount: local.cues.length });
+      return local;
+    }
     try {
-      return await this.agentPlan(situation, catalog, recoverFrom);
+      const planned = await this.agentPlan(situation, catalog, recoverFrom);
+      logInfo("director.plan.llm", { cueCount: planned.cues.length, usedLlm: planned.usedLlm });
+      return planned;
     } catch (err) {
-      console.warn(`${MODULE_ID} | director LLM failed, using local ranker`, err);
+      logWarn("director.plan.llm.failed", { error: err });
       return { ...local, fallback: String(err.message || err) };
     }
   }
@@ -109,6 +121,12 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
         if (!impl) result = { error: `unknown tool ${name}` };
         else result = await impl(args);
         if (name === "propose_cues") proposal = result;
+        logInfo("director.tool", {
+          step,
+          name,
+          args: name === "search_catalog" || name === "verify_candidates" ? args : undefined,
+          resultPreview: summarizeToolResult(name, result)
+        });
         messages.push({
           role: "tool",
           tool_call_id: call.id,
@@ -160,4 +178,24 @@ function safeParse(value) {
   } catch {
     return {};
   }
+}
+
+function summarizeToolResult(name, result) {
+  if (!result) return null;
+  if (name === "search_catalog" && Array.isArray(result)) {
+    return result.slice(0, 6).map(row => ({ soundId: row.soundId, name: row.name, score: row.score }));
+  }
+  if (name === "verify_candidates") {
+    return {
+      kept: (result.kept ?? []).map(row => row.track?.soundId || row.soundId),
+      dropped: result.dropped
+    };
+  }
+  if (name === "propose_cues") {
+    return { cues: (result.cues ?? []).map(cue => ({ soundId: cue.soundId, why: cue.why })) };
+  }
+  if (name === "get_foundry_context") {
+    return { scene: result.sceneName, inCombat: result.inCombat, mood: result.mood };
+  }
+  return result;
 }

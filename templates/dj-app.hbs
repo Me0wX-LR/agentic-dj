@@ -6,6 +6,7 @@
     </button>
     <button type="button" data-action="suggest"><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.SuggestNow"}}</button>
     <button type="button" data-action="analyze"><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.AnalyzeLibrary"}}</button>
+    <button type="button" data-action="openManual"><i class="fa-solid fa-list"></i> {{localize "AGENTICDJ.Manual.Button"}}</button>
     <button type="button" data-action="stop"><i class="fa-solid fa-stop"></i> {{localize "AGENTICDJ.StopMusic"}}</button>
     <button type="button" data-action="openSettings"><i class="fa-solid fa-key"></i> {{localize "AGENTICDJ.SettingsMenuLabel"}}</button>
   </header>
@@ -49,6 +50,7 @@
       <div>
         <h3>{{localize "AGENTICDJ.Catalog"}}</h3>
         <p>{{catalog.analyzed}} / {{catalog.total}} analyzed</p>
+      {{#if analysisProgress}}<p class="agentic-dj-progress">{{analysisProgress}}</p>{{/if}}
       </div>
       <div>
         <h3>{{localize "AGENTICDJ.Memory"}}</h3>
@@ -57,6 +59,10 @@
         <p class="flexrow" style="gap:0.35rem;">
           <button type="button" data-action="openMemory">{{localize "AGENTICDJ.OpenMemory"}}</button>
           <button type="button" data-action="forgetMemory">{{localize "AGENTICDJ.ForgetMemory"}}</button>
+        </p>
+        <p class="flexrow" style="gap:0.35rem;">
+          <button type="button" data-action="copyLogs">{{localize "AGENTICDJ.CopyLogs"}}</button>
+          <button type="button" data-action="openLogs">{{localize "AGENTICDJ.OpenLogs"}}</button>
         </p>
       </div>
     </section>

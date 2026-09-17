@@ -41,6 +41,7 @@ export function registerSettings() {
   game.settings.register(MODULE_ID, "cooldown", { ...world, type: Number, default: DEFAULTS.cooldown });
   game.settings.register(MODULE_ID, "maxProposals", { ...world, type: Number, default: DEFAULTS.maxProposals });
   game.settings.register(MODULE_ID, "learnedMemory", { ...world, type: Object, default: {} });
+  game.settings.register(MODULE_ID, "manualCatalogDraft", { ...world, type: String, default: "" });
 }
 
 export function llmConfig() {
@@ -73,6 +74,22 @@ export function hasLlmKey() {
   const cfg = llmConfig();
   if (cfg.provider === "ollama") return Boolean(cfg.baseUrl);
   return Boolean(cfg.apiKey && cfg.baseUrl && cfg.model);
+}
+
+/** Redacted LLM config for F12 / debug.log. Never includes the raw key. */
+export function publicLlmConfig() {
+  const cfg = llmConfig();
+  return {
+    provider: cfg.provider,
+    baseUrl: cfg.baseUrl,
+    model: cfg.model,
+    hasKey: Boolean(cfg.apiKey),
+    keyHint: cfg.apiKey ? `••••${String(cfg.apiKey).slice(-4)}` : "",
+    temperature: cfg.temperature,
+    maxTokens: cfg.maxTokens,
+    topP: cfg.topP,
+    extraInstructions: cfg.extraInstructions ? `${cfg.extraInstructions.length} chars` : ""
+  };
 }
 
 function clamp(value, min, max) {

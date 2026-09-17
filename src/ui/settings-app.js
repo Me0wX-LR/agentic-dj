@@ -1,4 +1,5 @@
 import { DEFAULTS, LLM_PRESETS, MODULE_ID, STT_PRESETS, normalizeLlmBaseUrl } from "../constants.js";
+import { logInfo } from "../debug/log.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -162,6 +163,17 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
     }
 
     const stored = game.settings.get(MODULE_ID, "llmApiKey");
+    logInfo("settings.saved", {
+      llmProvider: game.settings.get(MODULE_ID, "llmProvider"),
+      llmBaseUrl: game.settings.get(MODULE_ID, "llmBaseUrl"),
+      llmModel: game.settings.get(MODULE_ID, "llmModel"),
+      hasLlmKey: Boolean(stored),
+      keyHint: game.settings.get(MODULE_ID, "llmApiKeyHint"),
+      temperature: game.settings.get(MODULE_ID, "llmTemperature"),
+      maxTokens: game.settings.get(MODULE_ID, "llmMaxTokens"),
+      topP: game.settings.get(MODULE_ID, "llmTopP"),
+      autoAnalyze: game.settings.get(MODULE_ID, "autoAnalyze")
+    });
     ui.notifications.info(stored
       ? game.i18n.localize("AGENTICDJ.Settings.SaveOk")
       : game.i18n.localize("AGENTICDJ.Settings.SaveOkNoKey"));

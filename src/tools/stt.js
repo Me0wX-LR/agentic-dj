@@ -1,4 +1,4 @@
-import { MODULE_ID } from "../constants.js";
+import { logWarn } from "../debug/log.js";
 import { sttConfig } from "../settings.js";
 
 export class SpeechListener {
@@ -55,7 +55,7 @@ export class SpeechListener {
       if (text) this.onText(text, "mic");
     };
     recognition.onerror = event => {
-      console.warn(`${MODULE_ID} | speech error`, event.error);
+      logWarn("stt.speech.error", { error: event.error });
       if (event.error === "not-allowed") {
         ui.notifications.error(game.i18n.localize("AGENTICDJ.MicDenied"));
         this.stop();
@@ -86,7 +86,7 @@ export class SpeechListener {
         const text = await transcribeBlob(event.data, cfg);
         if (text) this.onText(text, "mic");
       } catch (err) {
-        console.warn(`${MODULE_ID} | STT failed`, err);
+        logWarn("stt.transcribe.failed", { error: err });
       }
     };
     this.recorder = recorder;

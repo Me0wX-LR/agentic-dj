@@ -54,11 +54,19 @@
   white-space: nowrap;
 }
 
-.agentic-dj-keystatus {
-  margin: 0;
-  padding: 0.35rem 0.75rem 0;
+.agentic-dj-progress {
+  min-height: 1.2em;
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.agentic-dj-settings textarea[name="catalogText"] {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.85rem;
-  opacity: 0.85;
+  min-height: 22rem;
+  width: 100%;
+  resize: vertical;
 }
 
 .agentic-dj-settings .hint,

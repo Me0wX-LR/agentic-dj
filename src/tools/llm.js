@@ -1,5 +1,5 @@
-import { MODULE_ID } from "../constants.js";
-import { llmConfig } from "../settings.js";
+import { logError, logInfo, logWarn } from "../debug/log.js";
+import { llmConfig, publicLlmConfig } from "../settings.js";
 
 function headers(cfg) {
   const h = { "Content-Type": "application/json" };
@@ -13,7 +13,10 @@ function headers(cfg) {
 
 export async function chatComplete({ messages, tools, toolChoice = "auto", temperature, maxTokens, topP, json = false }) {
   const cfg = llmConfig();
-  if (!cfg.baseUrl) throw new Error("LLM base URL is empty");
+  if (!cfg.baseUrl) {
+    logError("llm.config.empty", publicLlmConfig());
+    throw new Error("LLM base URL is empty");
+  }
   const body = {
     model: cfg.model,
     messages,
@@ -29,20 +32,53 @@ export async function chatComplete({ messages, tools, toolChoice = "auto", tempe
   }
   if (json) body.response_format = { type: "json_object" };
 
-  const response = await fetch(`${cfg.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: headers(cfg),
-    body: JSON.stringify(body)
+  const url = `${cfg.baseUrl}/chat/completions`;
+  const started = Date.now();
+  logInfo("llm.request", {
+    url,
+    jsonMode: json,
+    toolCount: tools?.length ?? 0,
+    messageCount: messages?.length ?? 0,
+    ...publicLlmConfig()
   });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: headers(cfg),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000)
+    });
+  } catch (err) {
+    logError("llm.fetch.failed", { url, error: err, elapsedMs: Date.now() - started });
+    throw err;
+  }
   if (!response.ok) {
     const text = await response.text();
+    logError("llm.response.error", {
+      url,
+      status: response.status,
+      body: text.slice(0, 800),
+      elapsedMs: Date.now() - started
+    });
     throw new Error(`LLM ${response.status}: ${text.slice(0, 400)}`);
   }
   const data = await response.json();
-  return data.choices?.[0]?.message ?? { role: "assistant", content: "" };
+  const message = data.choices?.[0]?.message ?? { role: "assistant", content: "" };
+  logInfo("llm.response.ok", {
+    url,
+    status: response.status,
+    elapsedMs: Date.now() - started,
+    finish: data.choices?.[0]?.finish_reason,
+    usage: data.usage,
+    toolCalls: (message.tool_calls ?? []).map(call => call.function?.name).filter(Boolean),
+    contentChars: String(message.content || "").length,
+    contentPreview: String(message.content || "").slice(0, 240)
+  });
+  return message;
 }
 
-export async function chatJson(messages, schemaHint = "") {
+export async function chatJson(messages, schemaHint = "", { maxTokens } = {}) {
   const extra = schemaHint ? `\nReturn ONLY valid JSON. ${schemaHint}` : "\nReturn ONLY valid JSON.";
   const cloned = messages.map(msg => ({ ...msg }));
   cloned[cloned.length - 1] = {
@@ -50,11 +86,11 @@ export async function chatJson(messages, schemaHint = "") {
     content: `${cloned[cloned.length - 1].content}${extra}`
   };
   try {
-    const message = await chatComplete({ messages: cloned, json: true, tools: undefined });
+    const message = await chatComplete({ messages: cloned, json: true, tools: undefined, maxTokens });
     return parseJsonContent(message.content);
   } catch (err) {
-    console.warn(`${MODULE_ID} | JSON mode unsupported, retrying plain chat`, err);
-    const message = await chatComplete({ messages: cloned, json: false, tools: undefined });
+    logWarn("llm.json.retry", { error: err });
+    const message = await chatComplete({ messages: cloned, json: false, tools: undefined, maxTokens });
     return parseJsonContent(message.content);
   }
 }
@@ -67,7 +103,7 @@ export function parseJsonContent(content) {
   try {
     return JSON.parse(match[0]);
   } catch (err) {
-    console.warn(`${MODULE_ID} | JSON parse failed`, err);
+    logWarn("llm.json.parse", { error: err, preview: String(content).slice(0, 240) });
     return {};
   }
 }

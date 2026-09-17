@@ -1,7 +1,8 @@
 import { MODULE_ID } from "../constants.js";
+import { logError, logInfo } from "../debug/log.js";
 import { catalogStats } from "../rag/catalog.js";
 import { SessionMemory, memoryPath, moodFromSituation } from "../memory/session.js";
-import { setting } from "../settings.js";
+import { publicLlmConfig, setting } from "../settings.js";
 import { playSoundById, previewSound, stopAllMusic } from "../tools/playlists.js";
 import { Director } from "./director.js";
 import { Librarian } from "./librarian.js";
@@ -19,14 +20,26 @@ export class Orchestrator {
     this.lastSuggestAt = 0;
     this.app = null;
     this.debounce = null;
+    this.analysisProgress = "";
   }
 
   async start() {
+    logInfo("orchestrator.start", { autoAnalyze: setting("autoAnalyze"), llm: publicLlmConfig() });
     await this.memory.load();
     this.listener.startHooks();
     this.situation = this.listener.brief();
+    logInfo("orchestrator.ready", {
+      scene: this.situation.sceneName,
+      inCombat: this.situation.inCombat,
+      catalog: catalogStats()
+    });
     if (setting("autoAnalyze")) {
-      this.analyzeLibrary().catch(err => console.warn(`${MODULE_ID} | auto-analyze`, err));
+      const stats = catalogStats();
+      if (stats.pending > 8) {
+        logInfo("orchestrator.autoAnalyze.skipped", { pending: stats.pending, reason: "use-manual-list" });
+      } else {
+        this.analyzeLibrary().catch(err => logError("orchestrator.autoAnalyze.failed", { error: err }));
+      }
     }
   }
 
@@ -41,12 +54,14 @@ export class Orchestrator {
   async toggleListen() {
     if (this.listener.listening) this.listener.stopMic();
     else await this.listener.startMic();
+    logInfo("orchestrator.listen", { listening: this.listener.listening });
     this.refreshUi();
   }
 
   async analyzeLibrary(force = false) {
     this.status = "analyzing";
     this.refreshUi();
+    logInfo("orchestrator.analyze", { force });
     try {
       const { results, failures, scanned, catalogSize } = await this.librarian.analyzeAll({ force });
       this.status = "idle";
@@ -66,9 +81,61 @@ export class Orchestrator {
       return results;
     } catch (err) {
       this.status = "error";
+      logError("orchestrator.analyze.failed", { error: err });
       ui.notifications.error(err.message);
       throw err;
     } finally {
+      this.analysisProgress = "";
+      this.refreshUi();
+    }
+  }
+
+  async analyzeFromList(text, { suggestAfter = false, situationNote = "", onProgress } = {}) {
+    this.status = "analyzing";
+    this.analysisProgress = "Reading catalog list…";
+    this.refreshUi();
+    logInfo("orchestrator.manual.analyze", { suggestAfter, situationChars: situationNote.length });
+    try {
+      await game.settings.set(MODULE_ID, "manualCatalogDraft", text);
+      const { results, failures, unmatched, scanned } = await this.librarian.analyzeFromList(text, {
+        onProgress: message => {
+          this.analysisProgress = message;
+          onProgress?.(message);
+          this.refreshUi();
+        }
+      });
+      this.status = "idle";
+      this.analysisProgress = "";
+      if (!scanned) {
+        ui.notifications.warn(game.i18n.localize("AGENTICDJ.Manual.Empty"));
+      } else if (!results.length) {
+        ui.notifications.error(game.i18n.format("AGENTICDJ.Manual.NoneMatched", {
+          scanned,
+          sample: unmatched.slice(0, 3).join(", ")
+        }));
+      } else {
+        const extra = unmatched.length ? ` ${game.i18n.format("AGENTICDJ.Manual.Unmatched", { count: unmatched.length })}` : "";
+        ui.notifications.info(`${game.i18n.format("AGENTICDJ.Manual.Saved", { count: results.length })}${extra}`);
+        if (failures.length) ui.notifications.warn(game.i18n.format("AGENTICDJ.AnalyzedPartial", {
+          count: results.length,
+          failed: failures.length
+        }));
+      }
+      if (suggestAfter && results.length) {
+        if (situationNote) {
+          this.listener.transcript.push({ text: situationNote, source: "manual", at: Date.now() });
+          this.listener.transcript = this.listener.transcript.slice(-40);
+        }
+        await this.suggestNow();
+      }
+      return results;
+    } catch (err) {
+      this.status = "error";
+      logError("orchestrator.manual.failed", { error: err });
+      ui.notifications.error(err.message);
+      throw err;
+    } finally {
+      this.analysisProgress = "";
       this.refreshUi();
     }
   }
@@ -77,13 +144,28 @@ export class Orchestrator {
     this.status = "planning";
     this.refreshUi();
     this.situation = this.listener.brief();
+    logInfo("orchestrator.suggest", {
+      recoverFrom,
+      scene: this.situation.sceneName,
+      inCombat: this.situation.inCombat,
+      mood: this.situation.mood,
+      transcript: String(this.situation.transcript || "").slice(0, 200)
+    });
     try {
       this.proposal = await this.director.plan(this.situation, { recoverFrom });
       this.lastSuggestAt = Date.now();
       this.status = "awaiting-gm";
+      logInfo("orchestrator.suggest.done", {
+        usedLlm: this.proposal.usedLlm,
+        cueCount: this.proposal.cues?.length ?? 0,
+        cues: (this.proposal.cues ?? []).map(cue => ({ name: cue.name, mood: cue.mood, soundId: cue.soundId })),
+        dropped: this.proposal.dropped,
+        fallback: this.proposal.fallback || ""
+      });
       return this.proposal;
     } catch (err) {
       this.status = "error";
+      logError("orchestrator.suggest.failed", { error: err });
       ui.notifications.error(err.message);
       throw err;
     } finally {
@@ -93,6 +175,7 @@ export class Orchestrator {
 
   async playCue(soundId) {
     const cue = this.proposal.cues.find(row => row.soundId === soundId);
+    logInfo("orchestrator.play", { soundId, name: cue?.name });
     await playSoundById(soundId);
     await this.memory.record("play", {
       soundId,
@@ -112,6 +195,7 @@ export class Orchestrator {
 
   async skipCue(soundId) {
     const cue = this.proposal.cues.find(row => row.soundId === soundId);
+    logInfo("orchestrator.skip", { soundId, name: cue?.name });
     await this.memory.record("skip", {
       soundId,
       name: cue?.name,
@@ -125,6 +209,7 @@ export class Orchestrator {
 
   async banCue(soundId) {
     const cue = this.proposal.cues.find(row => row.soundId === soundId);
+    logInfo("orchestrator.ban", { soundId, name: cue?.name });
     await this.memory.record("ban", {
       soundId,
       name: cue?.name,
@@ -138,6 +223,17 @@ export class Orchestrator {
 
   async openMemory() {
     await this.memory.openMarkdown();
+  }
+
+  async copyLogs() {
+    const { copyLogDump } = await import("../debug/log.js");
+    await copyLogDump();
+  }
+
+  async openLogs() {
+    const { openLogFile, persistLogs } = await import("../debug/log.js");
+    await persistLogs();
+    await openLogFile();
   }
 
   async forgetMemory() {
@@ -159,19 +255,30 @@ export class Orchestrator {
       status: this.status,
       catalog: catalogStats(),
       memory: this.memory.snapshot(),
-      memoryPath: memoryPath()
+      memoryPath: memoryPath(),
+      analysisProgress: this.analysisProgress
     };
   }
 
   #onSituation(brief, reason) {
     this.situation = brief;
     this.refreshUi();
+    logInfo("listener.situation", {
+      reason,
+      scene: brief.sceneName,
+      inCombat: brief.inCombat,
+      mood: brief.mood,
+      transcript: String(brief.transcript || "").slice(0, 160)
+    });
     if (reason === "mic-start" || reason === "mic-stop") return;
     const cooldown = Number(setting("cooldown") || 20) * 1000;
-    if (Date.now() - this.lastSuggestAt < cooldown) return;
+    if (Date.now() - this.lastSuggestAt < cooldown) {
+      logInfo("orchestrator.autosuggest.cooldown", { reason, cooldownMs: cooldown });
+      return;
+    }
     clearTimeout(this.debounce);
     this.debounce = setTimeout(() => {
-      this.suggestNow().catch(err => console.warn(`${MODULE_ID} | autosuggest`, err));
+      this.suggestNow().catch(err => logError("orchestrator.autosuggest.failed", { error: err }));
     }, 1500);
   }
 }

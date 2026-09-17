@@ -1,4 +1,5 @@
 import { MODULE_ID } from "../constants.js";
+import { AgenticDjManualCatalog } from "./manual-catalog-app.js";
 import { AgenticDjSettings } from "./settings-app.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -23,8 +24,11 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
       ban: AgenticDjApp.onBan,
       preview: AgenticDjApp.onPreview,
       openSettings: AgenticDjApp.onOpenSettings,
+      openManual: AgenticDjApp.onOpenManual,
       openMemory: AgenticDjApp.onOpenMemory,
-      forgetMemory: AgenticDjApp.onForgetMemory
+      forgetMemory: AgenticDjApp.onForgetMemory,
+      copyLogs: AgenticDjApp.onCopyLogs,
+      openLogs: AgenticDjApp.onOpenLogs
     }
   };
 
@@ -81,6 +85,10 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     new AgenticDjSettings().render({ force: true });
   }
 
+  static onOpenManual() {
+    AgenticDjManualCatalog.open(this.orchestrator);
+  }
+
   static async onPlay(_event, target) {
     const id = target.dataset.soundId;
     const ok = await foundry.applications.api.DialogV2.confirm({
@@ -112,5 +120,18 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
       content: `<p>${game.i18n.localize("AGENTICDJ.MemoryClearConfirm")}</p>`
     });
     if (ok) await this.orchestrator.forgetMemory();
+  }
+
+  static async onCopyLogs() {
+    try {
+      await this.orchestrator.copyLogs();
+      ui.notifications.info(game.i18n.localize("AGENTICDJ.LogsCopied"));
+    } catch (err) {
+      ui.notifications.error(err.message);
+    }
+  }
+
+  static async onOpenLogs() {
+    await this.orchestrator.openLogs();
   }
 }

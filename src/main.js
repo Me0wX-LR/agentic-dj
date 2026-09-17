@@ -1,15 +1,28 @@
 import { MODULE_ID } from "./constants.js";
 import { Orchestrator } from "./agents/orchestrator.js";
-import { registerSettings } from "./settings.js";
+import {
+  copyLogDump,
+  formatLogDump,
+  getLogEntries,
+  logInfo,
+  openLogFile,
+  persistLogs
+} from "./debug/log.js";
+import { catalogStats } from "./rag/catalog.js";
+import { publicLlmConfig, registerSettings } from "./settings.js";
 import { attachControls } from "./ui/controls.js";
 import { AgenticDjApp } from "./ui/dj-app.js";
 
 Hooks.once("init", () => {
   registerSettings();
+  logInfo("module.init", { version: game.modules.get(MODULE_ID)?.version });
 });
 
 Hooks.once("ready", () => {
-  if (!game.user.isGM) return;
+  if (!game.user.isGM) {
+    logInfo("module.ready.skip", { reason: "not-gm" });
+    return;
+  }
   const orchestrator = new Orchestrator();
   orchestrator.start();
   attachControls(orchestrator);
@@ -17,9 +30,21 @@ Hooks.once("ready", () => {
     orchestrator,
     open: () => AgenticDjApp.open(orchestrator),
     analyze: force => orchestrator.analyzeLibrary(force),
-    suggest: () => orchestrator.suggestNow()
+    analyzeList: (text, options) => orchestrator.analyzeFromList(text, options),
+    suggest: () => orchestrator.suggestNow(),
+    logs: getLogEntries,
+    copyLogs: copyLogDump,
+    dumpLogs: formatLogDump,
+    persistLogs,
+    openLogs: openLogFile
   };
   game.modules.get(MODULE_ID).api = api;
   globalThis.agenticDj = api;
+  logInfo("module.ready", {
+    version: game.modules.get(MODULE_ID)?.version,
+    world: game.world?.id,
+    catalog: catalogStats(),
+    llm: publicLlmConfig()
+  });
   ui.notifications.info(game.i18n.localize("AGENTICDJ.Notify.Ready"));
 });

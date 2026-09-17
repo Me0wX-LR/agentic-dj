@@ -1,4 +1,5 @@
 import { MODULE_ID } from "../constants.js";
+import { logWarn } from "../debug/log.js";
 import { inferWantedMood } from "../rag/retrieve.js";
 import { renderMemoryMarkdown } from "./markdown.js";
 
@@ -96,7 +97,7 @@ export class SessionMemory {
     await game.settings.set(MODULE_ID, SETTING_KEY, this.snapshot());
     clearTimeout(this._writeTimer);
     this._writeTimer = setTimeout(() => {
-      this.writeMarkdown().catch(err => console.warn(`${MODULE_ID} | memory.md write failed`, err));
+      this.writeMarkdown().catch(err => logWarn("memory.md.write.failed", { error: err }));
     }, 250);
   }
 

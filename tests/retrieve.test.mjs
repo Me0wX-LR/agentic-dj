@@ -97,6 +97,44 @@ test("shipped defaults match the documented DJ sampling", async () => {
   assert.equal(DEFAULTS.llmProvider, "openrouter");
 });
 
+test("engineer logs redact API keys", async () => {
+  const { redact, maskSecret, logInfo, formatLogDump } = await import("../src/debug/log.js");
+  const fake = "sk-abcdefghijklmnopqrstuvwxyz123456";
+  assert.equal(maskSecret(fake).endsWith("3456"), true);
+  const hidden = redact({
+    apiKey: fake,
+    text: `Authorization Bearer ${fake}`
+  });
+  assert.equal(hidden.apiKey.includes("sk-abcd"), false);
+  assert.equal(String(hidden.text).includes("sk-abcd"), false);
+  logInfo("test.event", { apiKey: fake });
+  assert.match(formatLogDump(), /test\.event/);
+  assert.doesNotMatch(formatLogDump(), /sk-abcdefghijklmnopqrstuvwxyz123456/);
+});
+
+test("manual catalog parser matches names and filled columns", async () => {
+  const { parseManualCatalog, matchRowToTrack, heuristicCard, buildCatalogTemplate } = await import("../src/rag/manual-catalog.js");
+  const rows = parseManualCatalog(`
+# comment
+Warm Hearth | tavern | 2 | folk, social | Inns
+Steel Clash
+`);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].mood, "tavern");
+  assert.equal(rows[0].intensity, 2);
+  assert.deepEqual(rows[0].tags, ["folk", "social"]);
+  assert.equal(rows[1].mood, "");
+  const catalog = [
+    { soundId: "a", name: "Warm Hearth", playlistName: "Town", path: "music/hearth.ogg" },
+    { soundId: "b", name: "Steel Clash", playlistName: "Battle", path: "music/battle-steel.mp3" }
+  ];
+  assert.equal(matchRowToTrack(rows[0], catalog).soundId, "a");
+  assert.equal(matchRowToTrack(rows[1], catalog).soundId, "b");
+  const card = heuristicCard(rows[1], catalog[1]);
+  assert.equal(card.mood, "combat");
+  assert.match(buildCatalogTemplate(catalog), /Warm Hearth/);
+});
+
 test("memory markdown lists likes and bans", async () => {
   const { renderMemoryMarkdown } = await import("../src/memory/markdown.js");
   const md = renderMemoryMarkdown({
