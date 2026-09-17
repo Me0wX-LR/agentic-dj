@@ -48,7 +48,7 @@ export class SpeechListener {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang = game.i18n.lang || "en-US";
+    recognition.lang = speechLang();
     recognition.onresult = event => {
       const last = event.results[event.results.length - 1];
       const text = last?.[0]?.transcript?.trim();
@@ -137,4 +137,13 @@ async function transcribeDeepgram(blob, cfg) {
   if (!response.ok) throw new Error(`Deepgram ${response.status}: ${await response.text()}`);
   const data = await response.json();
   return data.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim() ?? "";
+}
+
+function speechLang() {
+  const foundry = String(game.i18n?.lang || "");
+  if (foundry.startsWith("zh-Hant") || foundry === "zh-TW") return "zh-TW";
+  if (foundry.startsWith("zh-HK") || foundry === "yue") return "zh-HK";
+  if (foundry.startsWith("zh")) return "zh-CN";
+  if (foundry && foundry !== "en") return foundry;
+  return navigator.language || "en-US";
 }

@@ -1,4 +1,5 @@
 import { FLAG_CARD, FLAG_SCOPE, MODULE_ID } from "../constants.js";
+import { catalogMoodCounts } from "./retrieve.js";
 
 function audioTaggerTags(doc) {
   const flags = doc.flags?.["audio-tagger"];
@@ -59,10 +60,15 @@ export function findSound(soundId) {
 export function catalogStats() {
   const catalog = listCatalog();
   const analyzed = catalog.filter(track => track.features || track.mood);
+  const moods = catalogMoodCounts(catalog);
   return {
     total: catalog.length,
     analyzed: analyzed.length,
-    pending: catalog.length - analyzed.length
+    pending: catalog.length - analyzed.length,
+    moods: moods.moods,
+    dominantMood: moods.dominantMood,
+    dominantCount: moods.dominantCount,
+    homogeneous: moods.homogeneous
   };
 }
 

@@ -37,29 +37,36 @@ export class Librarian {
   }
 
   async analyzeFromList(text, { onProgress } = {}) {
-    const { heuristicCard, matchRowToTrack, mergeCard, parseManualCatalog } = await import("../rag/manual-catalog.js");
-    const rows = parseManualCatalog(text);
+    const { parseManualCatalog, parseTableDraft } = await import("../rag/manual-catalog.js");
+    const rows = String(text || "").trim().startsWith("[") ? parseTableDraft(text) : parseManualCatalog(text);
+    return this.saveRows(rows, { llmFill: true, onProgress });
+  }
+
+  async saveRows(rawRows, { llmFill = false, onProgress } = {}) {
+    const { heuristicCard, matchRowToTrack, mergeCard, normalizeManualRow } = await import("../rag/manual-catalog.js");
+    const rows = (rawRows ?? []).map(normalizeManualRow).filter(row => row.included !== false && (row.name || row.soundId));
     const catalog = listCatalog();
-    logInfo("librarian.manual.start", { rows: rows.length, catalogSize: catalog.length, llm: publicLlmConfig() });
+    logInfo("librarian.manual.start", { rows: rows.length, catalogSize: catalog.length, llmFill, llm: publicLlmConfig() });
     const matched = [];
     const unmatched = [];
     for (const row of rows) {
       const track = matchRowToTrack(row, catalog);
-      if (!track) unmatched.push(row.name);
+      if (!track) unmatched.push(row.name || row.soundId);
       else matched.push({ row, track });
     }
     const byName = new Map();
-    if (hasLlmKey()) {
-      const batches = chunk(matched, 8);
+    if (llmFill && hasLlmKey()) {
+      const blanks = matched.filter(item => !item.row.mood);
+      const batches = chunk(blanks, 8);
       for (let index = 0; index < batches.length; index++) {
         const batch = batches[index];
-        onProgress?.(`LLM tagging ${index * 8 + 1}–${Math.min((index + 1) * 8, matched.length)} of ${matched.length}`);
+        onProgress?.(`LLM tagging ${index * 8 + 1}–${Math.min((index + 1) * 8, blanks.length)} of ${blanks.length}`);
         logInfo("librarian.manual.batch", { index: index + 1, size: batch.length });
         try {
           const payload = await chatJson([
             {
               role: "system",
-              content: `You are the Librarian for a TTRPG soundtrack DJ. Tag each listed track from its name and any GM notes. Moods: ${MOODS.join(", ")}. Do not invent tracks that are not in the list.${extraSystem()}`
+              content: `You are the Librarian for a TTRPG soundtrack DJ. Tag each listed track from its name and any GM notes. Moods: ${MOODS.join(", ")}. Japanese/Latin OST titles are not all exploration — infer combat, tension, sad, tavern, horror from the title. Do not invent tracks that are not in the list.${extraSystem()}`
             },
             {
               role: "user",

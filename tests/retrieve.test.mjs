@@ -80,6 +80,76 @@ test("learned likes boost a track in that mood", () => {
   assert.ok(ranked.find(row => row.track.soundId === "c").score > scoreTrack(drone, situation, {}).score);
 });
 
+test("cantonese death language infers combat not exploration", async () => {
+  const { inferWantedMood, retrieveTracks } = await import("../src/rag/retrieve.js");
+  assert.equal(inferWantedMood({ transcript: "餵點呀hello hello 死咗好多人" }), "combat");
+  const calm = {
+    soundId: "c",
+    name: "Rain",
+    mood: "exploration",
+    intensity: 3,
+    tags: ["rain"],
+    features: { energy: 0.12, tempo: 90 }
+  };
+  const hot = {
+    soundId: "h",
+    name: "Blood Stain",
+    mood: "exploration",
+    intensity: 3,
+    tags: ["blood"],
+    features: { energy: 0.62, tempo: 140 }
+  };
+  const ranked = retrieveTracks([calm, hot], { transcript: "死咗好多人" }, {}, { limit: 2, mood: "exploration" });
+  assert.equal(ranked[0].track.soundId, "h");
+});
+
+test("last proposed cards are rotated out of a tied catalog", () => {
+  const a = { soundId: "a", name: "Asphodelus", mood: "exploration", intensity: 3, tags: [], features: { energy: 0.12 } };
+  const b = { soundId: "b", name: "Crossandra", mood: "exploration", intensity: 3, tags: [], features: { energy: 0.12 } };
+  const c = { soundId: "c", name: "Reflections", mood: "exploration", intensity: 3, tags: [], features: { energy: 0.12 } };
+  const ranked = retrieveTracks([a, b, c], { transcript: "hello" }, { lastProposedIds: ["a", "b"] }, { limit: 1 });
+  assert.equal(ranked[0].track.soundId, "c");
+});
+
+test("mic transcript lapses after TTL", async () => {
+  const { pruneTranscript, mergeUtterance, MIC_TTL_MS, similarUtterance } = await import("../src/memory/transcript.js");
+  const now = 2_000_000;
+  const kept = pruneTranscript([
+    { text: "hello", source: "mic", at: now - 1000 },
+    { text: "old", source: "mic", at: now - MIC_TTL_MS - 50 }
+  ], now);
+  assert.equal(kept.length, 1);
+  assert.equal(kept[0].text, "hello");
+  const merged = mergeUtterance([{ text: "hello", source: "mic", at: now - 10 }], "hello hello", "mic", now);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].text, "hello hello");
+  assert.equal(similarUtterance("hello", "hello hello"), true);
+});
+
+test("manual table rows serialize and match by soundId", async () => {
+  const {
+    parseManualCatalog,
+    matchRowToTrack,
+    tableRowsFromCatalog,
+    parseTableDraft,
+    serializeTableDraft,
+    normalizeManualRow
+  } = await import("../src/rag/manual-catalog.js");
+  const catalog = [
+    { soundId: "a", name: "Warm Hearth", playlistName: "Town", path: "music/hearth.ogg", mood: "tavern", intensity: 2, tags: ["folk"] }
+  ];
+  const rows = tableRowsFromCatalog(catalog, { fill: true });
+  assert.equal(rows[0].mood, "tavern");
+  const empty = tableRowsFromCatalog(catalog, { fill: false });
+  assert.equal(empty[0].mood, "");
+  const parsed = parseTableDraft(serializeTableDraft(rows));
+  assert.equal(parsed[0].soundId, "a");
+  const normalized = normalizeManualRow({ soundId: "a", name: "Warm Hearth", tags: "folk, social", mood: "tavern" });
+  assert.deepEqual(normalized.tags, ["folk", "social"]);
+  assert.equal(matchRowToTrack(normalized, catalog).soundId, "a");
+  assert.equal(parseManualCatalog("Steel Clash | combat | 5").length, 1);
+});
+
 test("ChatAnywhere host-only URLs get /v1", async () => {
   const { normalizeLlmBaseUrl } = await import("../src/constants.js");
   assert.equal(normalizeLlmBaseUrl("https://api.chatanywhere.org"), "https://api.chatanywhere.org/v1");

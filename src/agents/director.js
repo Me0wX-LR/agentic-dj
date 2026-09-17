@@ -1,7 +1,7 @@
 import { DIRECTOR_TOOLS } from "../constants.js";
 import { logInfo, logWarn } from "../debug/log.js";
 import { listCatalog } from "../rag/catalog.js";
-import { inferWantedMood, retrieveTracks, verifyCandidates } from "../rag/retrieve.js";
+import { catalogMoodCounts, inferWantedMood, retrieveTracks, verifyCandidates } from "../rag/retrieve.js";
 import { hasLlmKey, setting } from "../settings.js";
 import { chatComplete, extraSystem, parseJsonContent } from "../tools/llm.js";
 
@@ -12,14 +12,19 @@ export class Director {
 
   async plan(situation, { recoverFrom = null } = {}) {
     const catalog = listCatalog().filter(track => track.features || track.mood);
-    const local = this.localPlan(situation, catalog);
+    const moods = catalogMoodCounts(catalog);
     logInfo("director.plan.start", {
       catalogWithCards: catalog.length,
       hasLlm: hasLlmKey(),
       recoverFrom,
-      mood: inferWantedMood(situation)
+      mood: inferWantedMood(situation),
+      intensity: situation.intensity,
+      catalogMoods: moods.moods,
+      homogeneous: moods.homogeneous,
+      skipped: this.memory.snapshot().skippedIds?.length ?? 0
     });
     if (!hasLlmKey() || catalog.length === 0) {
+      const local = this.localPlan(situation, catalog);
       logInfo("director.plan.local", { reason: !hasLlmKey() ? "no-llm-key" : "empty-catalog", cueCount: local.cues.length });
       return local;
     }
@@ -29,34 +34,40 @@ export class Director {
       return planned;
     } catch (err) {
       logWarn("director.plan.llm.failed", { error: err });
-      return { ...local, fallback: String(err.message || err) };
+      return { ...this.localPlan(situation, catalog), fallback: String(err.message || err) };
     }
   }
 
   localPlan(situation, catalog = listCatalog()) {
     const limit = Number(setting("maxProposals") || 3);
     const ranked = retrieveTracks(catalog, situation, this.memory.snapshot(), { limit });
+    const cues = ranked.map(row => ({
+      soundId: row.track.soundId,
+      name: row.track.name,
+      mood: row.track.mood,
+      intensity: row.track.intensity,
+      tags: row.track.tags,
+      why: row.reasons.slice(0, 3).join("; ") || "Best local match",
+      score: row.score,
+      playlistName: row.track.playlistName
+    }));
+    this.memory.noteProposed(cues.map(cue => cue.soundId));
     return {
       plan: `Local ranker: mood ${inferWantedMood(situation)}, combat=${Boolean(situation.inCombat)}.`,
-      cues: ranked.map(row => ({
-        soundId: row.track.soundId,
-        name: row.track.name,
-        mood: row.track.mood,
-        intensity: row.track.intensity,
-        tags: row.track.tags,
-        why: row.reasons.slice(0, 3).join("; ") || "Best local match",
-        score: row.score,
-        playlistName: row.track.playlistName
-      })),
+      cues,
       dropped: [],
       usedLlm: false
     };
   }
 
   async agentPlan(situation, catalog, recoverFrom) {
+    const memory = () => this.memory.snapshot();
     const tools = {
       get_foundry_context: () => situation,
-      search_catalog: (args = {}) => retrieveTracks(catalog, situation, this.memory.snapshot(), args).map(row => ({
+      search_catalog: (args = {}) => retrieveTracks(catalog, situation, memory(), {
+        ...args,
+        query: args.query || situation.transcript || ""
+      }).map(row => ({
         soundId: row.track.soundId,
         name: row.track.name,
         mood: row.track.mood,
@@ -71,21 +82,25 @@ export class Director {
         catalog,
         args.soundIds ?? [],
         situation,
-        this.memory.snapshot(),
-        args.intendedMood || situation.mood,
+        memory(),
+        args.intendedMood || inferWantedMood(situation),
         args.intendedIntensity || situation.intensity
       ),
       propose_cues: args => args
     };
 
+    const moods = catalogMoodCounts(catalog);
     const messages = [
       {
         role: "system",
         content: `You are the Director agent of Agentic DJ for Foundry VTT.
-Decompose the live situation into mood, intensity, and constraints.
+The mood field is a weak heuristic. Read transcript and chat in ANY language (Cantonese, Mandarin, Japanese, English) and infer the real table mood yourself.
 Use tools to search and verify the music catalog. Never invent soundIds.
-        Finish by calling propose_cues with 2-3 options. Do not play audio.
-If recovering from a GM skip/ban, do not reuse those tracks.
+Search with the inferred mood AND a short query taken from the transcript. Do not blindly reuse mood=exploration.
+If the catalog is mostly one stored mood, ignore those labels and rank by energy, tempo, intensity, and name.
+Never propose the same three tracks twice in a row when alternatives exist.
+If recovering from a GM skip/ban, verify search_catalog hits — never the skipped/banned id.
+Finish by calling propose_cues with 2-3 options. Do not play audio.
 Respect learned likes/avoids from memory.md.${extraSystem()}`
       },
       {
@@ -93,8 +108,10 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
         content: JSON.stringify({
           situation,
           recoverFrom,
-          memory: this.memory.snapshot(),
-          catalogSize: catalog.length
+          memory: memory(),
+          catalogSize: catalog.length,
+          catalogMoods: moods.moods,
+          catalogHomogeneous: moods.homogeneous
         })
       }
     ];
@@ -143,7 +160,7 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
       proposal.cues.map(cue => cue.soundId),
       situation,
       this.memory.snapshot(),
-      situation.mood,
+      inferWantedMood(situation),
       situation.intensity
     );
     const cues = verified.kept.slice(0, Number(setting("maxProposals") || 3)).map(row => {
@@ -161,6 +178,7 @@ Respect learned likes/avoids from memory.md.${extraSystem()}`
       };
     });
     if (!cues.length) return this.localPlan(situation, catalog);
+    this.memory.noteProposed(cues.map(cue => cue.soundId));
     return {
       plan: proposal.plan || "LLM Director verified catalog matches.",
       cues,

@@ -61,6 +61,74 @@
   opacity: 0.9;
 }
 
+.agentic-dj-warn {
+  color: #e6c07b;
+  font-size: 0.9rem;
+}
+
+.agentic-dj-table-wrap {
+  overflow: auto;
+  max-height: 28rem;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 6px;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.agentic-dj-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.agentic-dj-table th,
+.agentic-dj-table td {
+  padding: 0.35rem 0.4rem;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.agentic-dj-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-cool-5, #1b1d1f);
+  text-align: left;
+}
+
+.agentic-dj-table td input,
+.agentic-dj-table td select {
+  width: 100%;
+  min-width: 0;
+}
+
+.agentic-dj-table td input[type="checkbox"] {
+  width: auto;
+}
+
+.agentic-dj-table td input[type="number"] {
+  width: 4rem;
+}
+
+.agentic-dj-manual-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.agentic-dj-viewer-body {
+  flex: 1 1 auto;
+  min-height: 18rem;
+  max-height: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.8rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+}
+
 .agentic-dj-settings textarea[name="catalogText"] {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.85rem;

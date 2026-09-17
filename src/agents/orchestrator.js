@@ -2,6 +2,7 @@ import { MODULE_ID } from "../constants.js";
 import { logError, logInfo } from "../debug/log.js";
 import { catalogStats } from "../rag/catalog.js";
 import { SessionMemory, memoryPath, moodFromSituation } from "../memory/session.js";
+import { mergeUtterance } from "../memory/transcript.js";
 import { publicLlmConfig, setting } from "../settings.js";
 import { playSoundById, previewSound, stopAllMusic } from "../tools/playlists.js";
 import { Director } from "./director.js";
@@ -18,6 +19,8 @@ export class Orchestrator {
     this.proposal = { cues: [], plan: "", dropped: [] };
     this.status = "idle";
     this.lastSuggestAt = 0;
+    this.planSeq = 0;
+    this.skipLock = new Map();
     this.app = null;
     this.debounce = null;
     this.analysisProgress = "";
@@ -104,31 +107,7 @@ export class Orchestrator {
           this.refreshUi();
         }
       });
-      this.status = "idle";
-      this.analysisProgress = "";
-      if (!scanned) {
-        ui.notifications.warn(game.i18n.localize("AGENTICDJ.Manual.Empty"));
-      } else if (!results.length) {
-        ui.notifications.error(game.i18n.format("AGENTICDJ.Manual.NoneMatched", {
-          scanned,
-          sample: unmatched.slice(0, 3).join(", ")
-        }));
-      } else {
-        const extra = unmatched.length ? ` ${game.i18n.format("AGENTICDJ.Manual.Unmatched", { count: unmatched.length })}` : "";
-        ui.notifications.info(`${game.i18n.format("AGENTICDJ.Manual.Saved", { count: results.length })}${extra}`);
-        if (failures.length) ui.notifications.warn(game.i18n.format("AGENTICDJ.AnalyzedPartial", {
-          count: results.length,
-          failed: failures.length
-        }));
-      }
-      if (suggestAfter && results.length) {
-        if (situationNote) {
-          this.listener.transcript.push({ text: situationNote, source: "manual", at: Date.now() });
-          this.listener.transcript = this.listener.transcript.slice(-40);
-        }
-        await this.suggestNow();
-      }
-      return results;
+      return await this.#finishManualSave({ results, failures, unmatched, scanned, suggestAfter, situationNote });
     } catch (err) {
       this.status = "error";
       logError("orchestrator.manual.failed", { error: err });
@@ -140,8 +119,65 @@ export class Orchestrator {
     }
   }
 
+  async saveCatalogRows(rows, { suggestAfter = false, situationNote = "", llmFill = false, onProgress } = {}) {
+    this.status = "analyzing";
+    this.analysisProgress = "Saving catalog table…";
+    this.refreshUi();
+    const { serializeTableDraft } = await import("../rag/manual-catalog.js");
+    logInfo("orchestrator.manual.table", { rows: rows.length, suggestAfter, llmFill });
+    try {
+      await game.settings.set(MODULE_ID, "manualCatalogDraft", serializeTableDraft(rows));
+      const { results, failures, unmatched, scanned } = await this.librarian.saveRows(rows, {
+        llmFill,
+        onProgress: message => {
+          this.analysisProgress = message;
+          onProgress?.(message);
+          this.refreshUi();
+        }
+      });
+      return await this.#finishManualSave({ results, failures, unmatched, scanned, suggestAfter, situationNote });
+    } catch (err) {
+      this.status = "error";
+      logError("orchestrator.manual.failed", { error: err });
+      ui.notifications.error(err.message);
+      throw err;
+    } finally {
+      this.analysisProgress = "";
+      this.refreshUi();
+    }
+  }
+
+  async #finishManualSave({ results, failures, unmatched, scanned, suggestAfter, situationNote }) {
+    this.status = "idle";
+    this.analysisProgress = "";
+    if (!scanned) {
+      ui.notifications.warn(game.i18n.localize("AGENTICDJ.Manual.Empty"));
+    } else if (!results.length) {
+      ui.notifications.error(game.i18n.format("AGENTICDJ.Manual.NoneMatched", {
+        scanned,
+        sample: unmatched.slice(0, 3).join(", ")
+      }));
+    } else {
+      const extra = unmatched.length ? ` ${game.i18n.format("AGENTICDJ.Manual.Unmatched", { count: unmatched.length })}` : "";
+      ui.notifications.info(`${game.i18n.format("AGENTICDJ.Manual.Saved", { count: results.length })}${extra}`);
+      if (failures.length) ui.notifications.warn(game.i18n.format("AGENTICDJ.AnalyzedPartial", {
+        count: results.length,
+        failed: failures.length
+      }));
+    }
+    if (suggestAfter && results.length) {
+      if (situationNote) {
+        this.listener.transcript = mergeUtterance(this.listener.transcript, situationNote, "manual");
+      }
+      await this.suggestNow();
+    }
+    return results;
+  }
+
   async suggestNow({ recoverFrom = null } = {}) {
+    const token = ++this.planSeq;
     this.status = "planning";
+    this.lastSuggestAt = Date.now();
     this.refreshUi();
     this.situation = this.listener.brief();
     logInfo("orchestrator.suggest", {
@@ -149,11 +185,17 @@ export class Orchestrator {
       scene: this.situation.sceneName,
       inCombat: this.situation.inCombat,
       mood: this.situation.mood,
-      transcript: String(this.situation.transcript || "").slice(0, 200)
+      intensity: this.situation.intensity,
+      transcript: String(this.situation.transcript || "").slice(0, 200),
+      planSeq: token
     });
     try {
-      this.proposal = await this.director.plan(this.situation, { recoverFrom });
-      this.lastSuggestAt = Date.now();
+      const proposal = await this.director.plan(this.situation, { recoverFrom });
+      if (token !== this.planSeq) {
+        logInfo("orchestrator.suggest.stale", { token, current: this.planSeq });
+        return this.proposal;
+      }
+      this.proposal = proposal;
       this.status = "awaiting-gm";
       logInfo("orchestrator.suggest.done", {
         usedLlm: this.proposal.usedLlm,
@@ -164,12 +206,13 @@ export class Orchestrator {
       });
       return this.proposal;
     } catch (err) {
+      if (token !== this.planSeq) return this.proposal;
       this.status = "error";
       logError("orchestrator.suggest.failed", { error: err });
       ui.notifications.error(err.message);
       throw err;
     } finally {
-      this.refreshUi();
+      if (token === this.planSeq) this.refreshUi();
     }
   }
 
@@ -194,8 +237,17 @@ export class Orchestrator {
   }
 
   async skipCue(soundId) {
+    const now = Date.now();
+    const last = this.skipLock.get(soundId) || 0;
+    if (now - last < 400) return;
+    this.skipLock.set(soundId, now);
     const cue = this.proposal.cues.find(row => row.soundId === soundId);
     logInfo("orchestrator.skip", { soundId, name: cue?.name });
+    this.proposal = {
+      ...this.proposal,
+      cues: this.proposal.cues.filter(row => row.soundId !== soundId)
+    };
+    this.refreshUi();
     await this.memory.record("skip", {
       soundId,
       name: cue?.name,
@@ -260,6 +312,12 @@ export class Orchestrator {
     };
   }
 
+  clearTranscript() {
+    this.listener.clearTranscript();
+    this.situation = this.listener.brief();
+    this.refreshUi();
+  }
+
   #onSituation(brief, reason) {
     this.situation = brief;
     this.refreshUi();
@@ -268,9 +326,15 @@ export class Orchestrator {
       scene: brief.sceneName,
       inCombat: brief.inCombat,
       mood: brief.mood,
+      intensity: brief.intensity,
+      transcriptAgeMs: brief.transcriptAgeMs,
       transcript: String(brief.transcript || "").slice(0, 160)
     });
-    if (reason === "mic-start" || reason === "mic-stop") return;
+    if (reason === "mic-start" || reason === "mic-stop" || reason === "mic-lapse" || reason === "transcript-clear") return;
+    if (this.status === "planning") {
+      logInfo("orchestrator.autosuggest.busy", { reason });
+      return;
+    }
     const cooldown = Number(setting("cooldown") || 20) * 1000;
     if (Date.now() - this.lastSuggestAt < cooldown) {
       logInfo("orchestrator.autosuggest.cooldown", { reason, cooldownMs: cooldown });
@@ -278,6 +342,7 @@ export class Orchestrator {
     }
     clearTimeout(this.debounce);
     this.debounce = setTimeout(() => {
+      if (this.status === "planning") return;
       this.suggestNow().catch(err => logError("orchestrator.autosuggest.failed", { error: err }));
     }, 1500);
   }

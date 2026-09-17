@@ -6,28 +6,75 @@
 const COMBAT_MOODS = new Set(["combat", "epic", "tension"]);
 const CALM_MOODS = new Set(["ambient", "exploration", "social", "tavern", "travel", "sad"]);
 
+const MOOD_RULES = [
+  { mood: "combat", re: /combat|fight|initiative|attack|battle|ambush|\bkill(?:ed)?\b|\bdy(?:ing|ed)\b|\bdeath\b|slaughter|戰鬥|打仗|開戰|攻擊|攻撃|戦い|戦闘|先攻|死咗|死了|死人|殺死|擊殺|敵人/i },
+  { mood: "tavern", re: /tavern|\binn\b|\bale\b|\bbar\b|酒館|酒吧|旅館|旅馆|居酒屋/i },
+  { mood: "horror", re: /horror|undead|haunt|fear|dread|恐怖|鬼|亡靈|haunt/i },
+  { mood: "sad", re: /sad|funeral|grief|loss|悲傷|葬禮|哭喪|哀悼/i },
+  { mood: "mystery", re: /mystery|clue|secret|whisper|謎|秘密|線索/i },
+  { mood: "tension", re: /tense|tension|stealth|sneak|潛行|偷偷|緊張/i },
+  { mood: "travel", re: /travel|road|journey|horse|旅行|旅途|道路/i },
+  { mood: "social", re: /social|court|nobl|ball|社交|宮廷|宴会/i }
+];
+
 export function tokenize(text = "") {
-  return String(text)
-    .toLowerCase()
-    .split(/[^a-z0-9]+/g)
-    .filter(token => token.length > 2);
+  const raw = String(text).toLowerCase();
+  const latin = raw.split(/[^a-z0-9]+/g).filter(token => token.length > 2);
+  const cjk = raw.match(/[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]{2,8}/g) || [];
+  return [...latin, ...cjk];
 }
 
 export function situationTags(situation = {}) {
   const parts = [
     situation.sceneName,
-    situation.mood,
     situation.transcript,
     situation.recentChat,
-    situation.inCombat ? "combat battle fight initiative" : "exploration scene"
+    situation.inCombat ? "combat battle fight initiative" : ""
   ];
+  const mood = situation.wantedMood || situation.mood;
+  if (mood) parts.push(mood);
   return new Set(tokenize(parts.filter(Boolean).join(" ")));
+}
+
+export function inferWantedMood(situation = {}) {
+  if (situation.inCombat) return "combat";
+  const spoken = `${situation.transcript ?? ""} ${situation.recentChat ?? ""}`;
+  const fromSpeech = matchMood(spoken);
+  if (fromSpeech) return fromSpeech;
+  const fromScene = matchMood(situation.sceneName ?? "");
+  if (fromScene) return fromScene;
+  return "exploration";
+}
+
+export function inferWantedIntensity(situation = {}) {
+  if (situation.inCombat) return 5;
+  const mood = inferWantedMood(situation);
+  if (mood === "combat" || mood === "epic") return 5;
+  if (mood === "tension" || mood === "horror") return 4;
+  if (mood === "ambient" || mood === "sad") return 2;
+  return Number(situation.intensity ?? 3) || 3;
+}
+
+function matchMood(text) {
+  const blob = String(text || "");
+  if (!blob.trim()) return "";
+  for (const rule of MOOD_RULES) {
+    if (rule.re.test(blob)) return rule.mood;
+  }
+  return "";
+}
+
+function resolveSearchMood(requested, inferred) {
+  if (!requested) return inferred;
+  if (requested === "exploration" && inferred && inferred !== "exploration") return inferred;
+  return requested;
 }
 
 export function scoreTrack(track, situation, memory = {}) {
   const banned = new Set(memory.bannedIds ?? []);
   const skipped = new Set(memory.skippedIds ?? []);
   const recent = memory.recentIds ?? [];
+  const proposed = memory.lastProposedIds ?? [];
   if (banned.has(track.soundId)) return { score: -Infinity, reasons: ["banned"] };
   if (skipped.has(track.soundId)) return { score: -Infinity, reasons: ["skipped"] };
 
@@ -49,7 +96,7 @@ export function scoreTrack(track, situation, memory = {}) {
   score += overlap * 3;
   if (overlap) reasons.push(`tag overlap ${overlap}`);
 
-  const wantedMood = inferWantedMood(situation);
+  const wantedMood = situation.wantedMood || inferWantedMood(situation);
   if (track.mood && track.mood === wantedMood) {
     score += 6;
     reasons.push(`mood ${track.mood}`);
@@ -62,24 +109,43 @@ export function scoreTrack(track, situation, memory = {}) {
   }
 
   const intensity = Number(track.intensity ?? 3);
-  const wantedIntensity = situation.inCombat ? 5 : Number(situation.intensity ?? 3);
+  const wantedIntensity = situation.inCombat
+    ? 5
+    : Number(situation.intensity ?? inferWantedIntensity(situation));
   const intensityDelta = Math.abs(intensity - wantedIntensity);
   score += 3 - intensityDelta;
 
   const energy = Number(track.features?.energy ?? 0.4);
-  if (situation.inCombat && energy > 0.45) {
-    score += 2;
-    reasons.push("high energy");
-  }
-  if (!situation.inCombat && energy < 0.4) {
-    score += 1;
-    reasons.push("calm energy");
+  const tempo = Number(track.features?.tempo ?? 0);
+  if (wantedMood === "combat" || wantedMood === "epic") {
+    if (energy > 0.45) {
+      score += 3;
+      reasons.push("high energy");
+    } else if (energy < 0.25) {
+      score -= 2;
+      reasons.push("too calm for combat");
+    }
+    if (tempo >= 130) score += 1;
+  } else if (CALM_MOODS.has(wantedMood)) {
+    if (energy < 0.4) {
+      score += 1;
+      reasons.push("calm energy");
+    }
+    if (energy > 0.55) {
+      score -= 2;
+      reasons.push("too hot for calm scene");
+    }
   }
 
   const recentIndex = recent.indexOf(track.soundId);
   if (recentIndex >= 0) {
     score -= (recent.length - recentIndex) * 2;
     reasons.push("recently played");
+  }
+
+  if (proposed.includes(track.soundId)) {
+    score -= 5;
+    reasons.push("on the last suggestion card");
   }
 
   const likeCount = memory.likes?.[wantedMood]?.[track.soundId]?.count
@@ -100,30 +166,27 @@ export function scoreTrack(track, situation, memory = {}) {
   return { score, reasons };
 }
 
-export function inferWantedMood(situation = {}) {
-  const blob = `${situation.mood ?? ""} ${situation.transcript ?? ""} ${situation.recentChat ?? ""} ${situation.sceneName ?? ""}`.toLowerCase();
-  if (situation.inCombat || /\b(combat|fight|initiative|attack|battle|ambush)\b/.test(blob)) return "combat";
-  if (/\b(tavern|inn|ale|bar)\b/.test(blob)) return "tavern";
-  if (/\b(horror|undead|haunt|fear|dread)\b/.test(blob)) return "horror";
-  if (/\b(sad|funeral|grief|loss)\b/.test(blob)) return "sad";
-  if (/\b(mystery|clue|secret|whisper)\b/.test(blob)) return "mystery";
-  if (/\b(tense|tension|stealth|sneak)\b/.test(blob)) return "tension";
-  if (/\b(travel|road|journey|horse)\b/.test(blob)) return "travel";
-  if (/\b(social|court|nobl|ball)\b/.test(blob)) return "social";
-  return situation.inCombat ? "combat" : "exploration";
-}
-
 export function retrieveTracks(catalog, situation, memory, { limit = 8, mood, tags, query, intensity } = {}) {
+  const inferred = inferWantedMood(situation);
+  const wantedMood = resolveSearchMood(mood, inferred);
+  const wantedIntensity = intensity ?? inferWantedIntensity({ ...situation, mood: wantedMood, wantedMood });
   const extra = {
     ...situation,
-    mood: mood || situation.mood,
-    intensity: intensity ?? situation.intensity,
+    mood: wantedMood,
+    wantedMood,
+    intensity: wantedIntensity,
     recentChat: [situation.recentChat, query, ...(tags ?? [])].filter(Boolean).join(" ")
   };
   return [...catalog]
     .map(track => ({ track, ...scoreTrack(track, extra, memory) }))
     .filter(row => Number.isFinite(row.score))
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aHit = (memory.lastProposedIds ?? []).includes(a.track.soundId);
+      const bHit = (memory.lastProposedIds ?? []).includes(b.track.soundId);
+      if (aHit !== bHit) return aHit ? 1 : -1;
+      return String(a.track.name || "").localeCompare(String(b.track.name || ""));
+    })
     .slice(0, limit);
 }
 
@@ -131,18 +194,44 @@ export function verifyCandidates(catalog, soundIds, situation, memory, intendedM
   const byId = new Map(catalog.map(track => [track.soundId, track]));
   const dropped = [];
   const kept = [];
+  const wantedMood = intendedMood || inferWantedMood(situation);
+  const extra = {
+    ...situation,
+    mood: wantedMood,
+    wantedMood,
+    intensity: intendedIntensity || inferWantedIntensity({ ...situation, wantedMood })
+  };
   for (const id of soundIds) {
     const track = byId.get(id);
     if (!track) {
       dropped.push({ soundId: id, reason: "not in catalog" });
       continue;
     }
-    const ranked = scoreTrack(track, { ...situation, mood: intendedMood, intensity: intendedIntensity }, memory);
-    if (ranked.score < 0) {
+    const ranked = scoreTrack(track, extra, memory);
+    if (!Number.isFinite(ranked.score) || ranked.score < 0) {
       dropped.push({ soundId: id, reason: ranked.reasons.join(", ") || "failed verification" });
       continue;
     }
     kept.push({ track, ...ranked });
   }
   return { kept, dropped };
+}
+
+export function catalogMoodCounts(catalog = []) {
+  const moods = {};
+  for (const track of catalog) {
+    if (!(track.features || track.mood)) continue;
+    const mood = track.mood || "untagged";
+    moods[mood] = (moods[mood] || 0) + 1;
+  }
+  const entries = Object.entries(moods).sort((a, b) => b[1] - a[1]);
+  const analyzed = entries.reduce((sum, [, count]) => sum + count, 0);
+  const [dominantMood, dominantCount] = entries[0] || ["", 0];
+  return {
+    moods,
+    analyzed,
+    dominantMood,
+    dominantCount,
+    homogeneous: analyzed >= 4 && dominantCount / analyzed >= 0.8
+  };
 }

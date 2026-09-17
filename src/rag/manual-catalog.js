@@ -26,6 +26,38 @@ export function buildCatalogTemplate(tracks = []) {
   return `${catalogTemplateHeader()}${lines.join("\n")}\n`;
 }
 
+export function tableRowsFromCatalog(tracks = [], { fill = true } = {}) {
+  return tracks.map(track => ({
+    included: true,
+    soundId: track.soundId,
+    name: track.name,
+    playlistName: track.playlistName || "",
+    mood: fill ? (track.mood || "") : "",
+    intensity: fill && track.intensity ? Number(track.intensity) : "",
+    tags: fill ? (track.tags ?? []).join(", ") : "",
+    useWhen: fill ? (track.useWhen || "") : "",
+    analyzed: Boolean(track.mood || track.features)
+  }));
+}
+
+export function parseTableDraft(value) {
+  const text = String(value || "").trim();
+  if (!text) return [];
+  if (text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return parseManualCatalog(text);
+}
+
+export function serializeTableDraft(rows = []) {
+  return JSON.stringify(rows);
+}
+
 export function parseManualCatalog(text) {
   const rows = [];
   for (const raw of String(text || "").split(/\r?\n/)) {
@@ -46,7 +78,25 @@ export function parseManualCatalog(text) {
   return rows;
 }
 
+export function normalizeManualRow(row = {}) {
+  return {
+    included: row.included !== false,
+    soundId: row.soundId || "",
+    name: row.name || "",
+    playlistName: row.playlistName || "",
+    mood: normalizeMood(row.mood),
+    intensity: parseIntensity(row.intensity),
+    tags: Array.isArray(row.tags) ? unique(row.tags) : splitTags(row.tags),
+    useWhen: row.useWhen || "",
+    avoidWhen: row.avoidWhen || ""
+  };
+}
+
 export function matchRowToTrack(row, catalog = []) {
+  if (row?.soundId) {
+    const byId = catalog.find(track => track.soundId === row.soundId);
+    if (byId) return byId;
+  }
   const needle = normalizeName(row?.name);
   if (!needle) return null;
   const exact = catalog.find(track => normalizeName(track.name) === needle);

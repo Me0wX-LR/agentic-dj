@@ -4,9 +4,9 @@
       <i class="fa-solid fa-microphone"></i>
       {{#if listening}}{{localize "AGENTICDJ.Listening"}}{{else}}{{localize "AGENTICDJ.Listen"}}{{/if}}
     </button>
-    <button type="button" data-action="suggest"><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.SuggestNow"}}</button>
+    <button type="button" data-action="suggest" {{#if planning}}disabled{{/if}}><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.SuggestNow"}}</button>
     <button type="button" data-action="analyze"><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.AnalyzeLibrary"}}</button>
-    <button type="button" data-action="openManual"><i class="fa-solid fa-list"></i> {{localize "AGENTICDJ.Manual.Button"}}</button>
+    <button type="button" data-action="openManual"><i class="fa-solid fa-table"></i> {{localize "AGENTICDJ.Manual.Button"}}</button>
     <button type="button" data-action="stop"><i class="fa-solid fa-stop"></i> {{localize "AGENTICDJ.StopMusic"}}</button>
     <button type="button" data-action="openSettings"><i class="fa-solid fa-key"></i> {{localize "AGENTICDJ.SettingsMenuLabel"}}</button>
   </header>
@@ -17,9 +17,10 @@
   <div class="agentic-dj-body">
     <section class="agentic-dj-card">
       <h3>{{localize "AGENTICDJ.Situation"}}</h3>
-      <p class="agentic-dj-meta">{{statusLabel}} · {{situation.sceneName}} · {{#if situation.inCombat}}Combat r{{situation.round}}{{else}}Exploration{{/if}}</p>
+      <p class="agentic-dj-meta">{{statusLabel}} · {{situation.sceneName}} · {{situation.mood}} {{situation.intensity}}/5 · {{#if situation.inCombat}}Combat r{{situation.round}}{{else}}Out of combat{{/if}}</p>
       <p>{{transcript}}</p>
-      <p class="agentic-dj-meta">Now: {{playing}}</p>
+      <p class="agentic-dj-meta">{{transcriptAge}} · Now: {{playing}}</p>
+      <p><button type="button" data-action="clearTranscript">{{localize "AGENTICDJ.ClearTranscript"}}</button></p>
     </section>
 
     <section class="agentic-dj-card">
@@ -37,10 +38,10 @@
           <p>{{cue.why}}</p>
           <p class="agentic-dj-tags">{{#each cue.tags}}<span>{{this}}</span>{{/each}}</p>
           <footer>
-            <button type="button" data-action="play" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Play"}}</button>
+            <button type="button" data-action="play" data-sound-id="{{cue.soundId}}" {{#if ../planning}}disabled{{/if}}>{{localize "AGENTICDJ.Play"}}</button>
             <button type="button" data-action="preview" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Preview"}}</button>
-            <button type="button" data-action="skip" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Skip"}}</button>
-            <button type="button" data-action="ban" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Ban"}}</button>
+            <button type="button" data-action="skip" data-sound-id="{{cue.soundId}}" {{#if ../planning}}disabled{{/if}}>{{localize "AGENTICDJ.Skip"}}</button>
+            <button type="button" data-action="ban" data-sound-id="{{cue.soundId}}" {{#if ../planning}}disabled{{/if}}>{{localize "AGENTICDJ.Ban"}}</button>
           </footer>
         </article>
       {{/each}}
@@ -50,6 +51,9 @@
       <div>
         <h3>{{localize "AGENTICDJ.Catalog"}}</h3>
         <p>{{catalog.analyzed}} / {{catalog.total}} analyzed</p>
+        {{#if catalog.homogeneous}}
+          <p class="agentic-dj-warn">{{localize "AGENTICDJ.CatalogHomogeneous"}} {{catalog.dominantCount}}/{{catalog.analyzed}} {{catalog.dominantMood}}. {{localize "AGENTICDJ.CatalogHomogeneousHint"}}</p>
+        {{/if}}
       {{#if analysisProgress}}<p class="agentic-dj-progress">{{analysisProgress}}</p>{{/if}}
       </div>
       <div>

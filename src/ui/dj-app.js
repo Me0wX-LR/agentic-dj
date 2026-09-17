@@ -28,7 +28,8 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
       openMemory: AgenticDjApp.onOpenMemory,
       forgetMemory: AgenticDjApp.onForgetMemory,
       copyLogs: AgenticDjApp.onCopyLogs,
-      openLogs: AgenticDjApp.onOpenLogs
+      openLogs: AgenticDjApp.onOpenLogs,
+      clearTranscript: AgenticDjApp.onClearTranscript
     }
   };
 
@@ -53,14 +54,20 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const context = await super._prepareContext(options);
     const snap = this.orchestrator.snapshot();
     const llmKey = game.settings.get(MODULE_ID, "llmApiKey") || "";
+    const ageMs = snap.situation.transcriptAgeMs;
+    const transcriptAge = snap.situation.transcript
+      ? (Number.isFinite(ageMs) ? game.i18n.format("AGENTICDJ.TranscriptAge", { seconds: Math.max(0, Math.round(ageMs / 1000)) }) : "")
+      : game.i18n.localize("AGENTICDJ.TranscriptLapsed");
     return {
       ...context,
       ...snap,
       statusLabel: snap.status,
+      planning: snap.status === "planning" || snap.status === "analyzing",
       hasCues: snap.proposal.cues.length > 0,
       hasLlmKey: Boolean(llmKey),
       llmKeyHint: game.settings.get(MODULE_ID, "llmApiKeyHint") || "",
-      transcript: snap.situation.transcript || "No transcript yet.",
+      transcript: snap.situation.transcript || game.i18n.localize("AGENTICDJ.TranscriptEmpty"),
+      transcriptAge,
       playing: (snap.situation.playing ?? []).map(row => `${row.playlist}: ${row.tracks.join(", ")}`).join(" · ") || "Silent"
     };
   }
@@ -87,6 +94,10 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static onOpenManual() {
     AgenticDjManualCatalog.open(this.orchestrator);
+  }
+
+  static onClearTranscript() {
+    this.orchestrator.clearTranscript();
   }
 
   static async onPlay(_event, target) {

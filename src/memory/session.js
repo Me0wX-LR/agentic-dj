@@ -10,6 +10,7 @@ function emptyState() {
   return {
     recentIds: [],
     skippedIds: [],
+    lastProposedIds: [],
     bannedIds: [],
     banned: [],
     likes: {},
@@ -48,13 +49,16 @@ export class SessionMemory {
   async load() {
     const fromWorld = game.settings.get(MODULE_ID, SETTING_KEY);
     if (fromWorld && typeof fromWorld === "object" && Object.keys(fromWorld).length) {
-      this.data = { ...emptyState(), ...fromWorld, skippedIds: [] };
+      this.data = { ...emptyState(), ...fromWorld };
+      this.data.skippedIds = Array.isArray(fromWorld.skippedIds) ? [...fromWorld.skippedIds] : [];
+      this.data.lastProposedIds = Array.isArray(fromWorld.lastProposedIds) ? [...fromWorld.lastProposedIds] : [];
     }
     const session = sessionStorage.getItem(SESSION_KEY);
     if (session) {
       try {
         const parsed = JSON.parse(session);
-        this.data.skippedIds = parsed.skippedIds ?? [];
+        this.data.skippedIds = uniqueIds([...(this.data.skippedIds ?? []), ...(parsed.skippedIds ?? [])]);
+        this.data.lastProposedIds = parsed.lastProposedIds ?? this.data.lastProposedIds ?? [];
         if (!this.data.recentIds.length && parsed.recentIds) this.data.recentIds = parsed.recentIds;
       } catch {
         // ignore
@@ -70,6 +74,7 @@ export class SessionMemory {
     if (action === "play") {
       this.data.recentIds = [soundId, ...this.data.recentIds.filter(id => id !== soundId)].slice(0, 12);
       this.data.skippedIds = this.data.skippedIds.filter(id => id !== soundId);
+      this.data.lastProposedIds = (this.data.lastProposedIds ?? []).filter(id => id !== soundId);
       bump(this.data.likes, mood || "general", soundId, name);
     } else if (action === "skip") {
       if (!this.data.skippedIds.includes(soundId)) this.data.skippedIds.push(soundId);
@@ -84,16 +89,34 @@ export class SessionMemory {
     await this.persist();
   }
 
+  noteProposed(soundIds = []) {
+    this.data.lastProposedIds = uniqueIds(soundIds).slice(0, 12);
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        skippedIds: this.data.skippedIds,
+        recentIds: this.data.recentIds,
+        lastProposedIds: this.data.lastProposedIds
+      }));
+    } catch {
+      // sessionStorage can be unavailable in some Foundry hosts
+    }
+  }
+
   async forget() {
     this.data = emptyState();
     await this.persist();
   }
 
   async persist() {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-      skippedIds: this.data.skippedIds,
-      recentIds: this.data.recentIds
-    }));
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        skippedIds: this.data.skippedIds,
+        recentIds: this.data.recentIds,
+        lastProposedIds: this.data.lastProposedIds
+      }));
+    } catch {
+      // ignore
+    }
     await game.settings.set(MODULE_ID, SETTING_KEY, this.snapshot());
     clearTimeout(this._writeTimer);
     this._writeTimer = setTimeout(() => {
@@ -126,19 +149,29 @@ export class SessionMemory {
   }
 
   async openMarkdown() {
-    await this.writeMarkdown();
-    const picker = filePickerClass();
-    const app = new picker({
-      type: "text",
-      current: memoryDir(),
-      callback: () => null
+    const text = this.toMarkdown();
+    try {
+      await this.writeMarkdown();
+    } catch (err) {
+      logWarn("memory.md.write.failed", { error: err });
+    }
+    const { openTextViewer } = await import("../ui/text-viewer.js");
+    openTextViewer({
+      title: game.i18n.localize("AGENTICDJ.Memory"),
+      filename: "memory.md",
+      path: memoryPath(),
+      hint: game.i18n.localize("AGENTICDJ.Viewer.MemoryHint"),
+      text
     });
-    app.render({ force: true });
   }
 }
 
 export function moodFromSituation(situation = {}, fallback = "") {
   return inferWantedMood(situation) || fallback || "general";
+}
+
+function uniqueIds(ids = []) {
+  return [...new Set(ids.filter(Boolean))];
 }
 
 function bump(map, mood, soundId, name) {

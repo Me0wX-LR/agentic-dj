@@ -120,14 +120,20 @@ export async function persistLogs() {
 }
 
 export async function openLogFile() {
-  await persistLogs();
-  const picker = filePickerClass();
-  const app = new picker({
-    type: "text",
-    current: logDir(),
-    callback: () => null
+  const text = formatLogDump();
+  try {
+    await persistLogs();
+  } catch (err) {
+    console.warn(`${MODULE_ID} | debug.log write failed`, err);
+  }
+  const { openTextViewer } = await import("../ui/text-viewer.js");
+  openTextViewer({
+    title: game.i18n.localize("AGENTICDJ.OpenLogs"),
+    filename: LOG_FILE,
+    path: logPath(),
+    hint: game.i18n.localize("AGENTICDJ.Viewer.LogHint"),
+    text
   });
-  app.render({ force: true });
 }
 
 function formatLine(entry) {
