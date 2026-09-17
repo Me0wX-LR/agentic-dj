@@ -20,14 +20,15 @@ function numericSetting(key, fallback) {
 export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: "agentic-dj-settings",
-    classes: ["agentic-dj"],
+    classes: ["agentic-dj", "agentic-dj-config"],
     tag: "div",
     window: {
       title: "AGENTICDJ.SettingsMenu",
       icon: "fa-solid fa-key",
-      contentClasses: ["standard-form"]
+      resizable: true,
+      contentClasses: ["standard-form", "agentic-dj-config-content"]
     },
-    position: { width: 580, height: 820 },
+    position: { width: 580, height: 640 },
     actions: {
       save: AgenticDjSettings.onSave,
       clearKeys: AgenticDjSettings.onClearKeys,
@@ -36,7 +37,10 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
   };
 
   static PARTS = {
-    body: { template: `modules/${MODULE_ID}/templates/settings.hbs` }
+    body: {
+      template: `modules/${MODULE_ID}/templates/settings.hbs`,
+      scrollable: [".agentic-dj-settings"]
+    }
   };
 
   async _prepareContext(options) {
