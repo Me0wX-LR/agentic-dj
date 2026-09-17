@@ -1,5 +1,9 @@
 <div class="standard-form flexcol agentic-dj-settings">
   <p class="notes">{{localize "AGENTICDJ.SettingsMenuHint"}}</p>
+  <p class="notes">{{localize "AGENTICDJ.Settings.DefaultsBanner"}}</p>
+
+  <fieldset class="agentic-dj-fieldset">
+    <legend>{{localize "AGENTICDJ.Settings.LlmSection"}}</legend>
 
   <div class="form-group">
     <label>{{localize "AGENTICDJ.Settings.LlmProvider"}}</label>
@@ -26,7 +30,10 @@
       <p class="hint">{{localize "AGENTICDJ.Settings.KeyMissing"}}</p>
     {{/if}}
   </div>
+  </fieldset>
 
+  <fieldset class="agentic-dj-fieldset">
+    <legend>{{localize "AGENTICDJ.Settings.SttSection"}}</legend>
   <div class="form-group">
     <label>{{localize "AGENTICDJ.Settings.SttProvider"}}</label>
     <select name="sttProvider">
@@ -50,40 +57,54 @@
       <p class="hint">{{localize "AGENTICDJ.Settings.KeySaved"}} {{sttKeyHint}}</p>
     {{/if}}
   </div>
+  </fieldset>
 
+  <fieldset class="agentic-dj-fieldset">
+    <legend>{{localize "AGENTICDJ.Settings.SamplingSection"}}</legend>
+    <p class="notes">{{localize "AGENTICDJ.Settings.SamplingIntro"}}</p>
   <div class="form-group">
-    <label>{{localize "AGENTICDJ.Settings.LlmTemperature"}}</label>
+    <label>{{localize "AGENTICDJ.Settings.LlmTemperature"}} <span class="agentic-dj-default">{{localize "AGENTICDJ.Settings.Default"}} {{defaults.llmTemperature}}</span></label>
     <input type="number" name="llmTemperature" value="{{llmTemperature}}" min="0" max="2" step="0.1" />
     <p class="hint">{{localize "AGENTICDJ.Settings.LlmTemperatureHint"}}</p>
   </div>
   <div class="form-group">
-    <label>{{localize "AGENTICDJ.Settings.LlmMaxTokens"}}</label>
+    <label>{{localize "AGENTICDJ.Settings.LlmMaxTokens"}} <span class="agentic-dj-default">{{localize "AGENTICDJ.Settings.Default"}} {{defaults.llmMaxTokens}}</span></label>
     <input type="number" name="llmMaxTokens" value="{{llmMaxTokens}}" min="64" max="4000" step="1" />
     <p class="hint">{{localize "AGENTICDJ.Settings.LlmMaxTokensHint"}}</p>
   </div>
   <div class="form-group">
-    <label>{{localize "AGENTICDJ.Settings.LlmTopP"}}</label>
+    <label>{{localize "AGENTICDJ.Settings.LlmTopP"}} <span class="agentic-dj-default">{{localize "AGENTICDJ.Settings.Default"}} {{defaults.llmTopP}}</span></label>
     <input type="number" name="llmTopP" value="{{llmTopP}}" min="0" max="1" step="0.05" />
     <p class="hint">{{localize "AGENTICDJ.Settings.LlmTopPHint"}}</p>
   </div>
+  </fieldset>
+
+  <fieldset class="agentic-dj-fieldset">
+    <legend>{{localize "AGENTICDJ.Settings.TableSection"}}</legend>
   <div class="form-group">
     <label>{{localize "AGENTICDJ.Settings.ExtraInstructions"}}</label>
     <textarea name="extraInstructions" rows="3">{{extraInstructions}}</textarea>
+    <p class="hint">{{localize "AGENTICDJ.Settings.ExtraInstructionsHint"}}</p>
   </div>
   <div class="form-group">
     <label>{{localize "AGENTICDJ.Settings.AutoAnalyze"}}</label>
     <input type="checkbox" name="autoAnalyze" {{#if autoAnalyze}}checked{{/if}} />
+    <p class="hint">{{localize "AGENTICDJ.Settings.AutoAnalyzeHint"}}</p>
   </div>
   <div class="form-group">
-    <label>{{localize "AGENTICDJ.Settings.Cooldown"}}</label>
+    <label>{{localize "AGENTICDJ.Settings.Cooldown"}} <span class="agentic-dj-default">{{localize "AGENTICDJ.Settings.Default"}} {{defaults.cooldown}}s</span></label>
     <input type="number" name="cooldown" value="{{cooldown}}" min="5" max="120" />
+    <p class="hint">{{localize "AGENTICDJ.Settings.CooldownHint"}}</p>
   </div>
   <div class="form-group">
-    <label>{{localize "AGENTICDJ.Settings.MaxProposals"}}</label>
+    <label>{{localize "AGENTICDJ.Settings.MaxProposals"}} <span class="agentic-dj-default">{{localize "AGENTICDJ.Settings.Default"}} {{defaults.maxProposals}}</span></label>
     <input type="number" name="maxProposals" value="{{maxProposals}}" min="1" max="3" />
+    <p class="hint">{{localize "AGENTICDJ.Settings.MaxProposalsHint"}}</p>
   </div>
+  </fieldset>
   <footer class="form-footer flexrow">
     <button type="button" data-action="save"><i class="fa-solid fa-save"></i> {{localize "AGENTICDJ.Settings.Save"}}</button>
+    <button type="button" data-action="resetSampling"><i class="fa-solid fa-rotate-left"></i> {{localize "AGENTICDJ.Settings.ResetDefaults"}}</button>
     <button type="button" data-action="clearKeys"><i class="fa-solid fa-eraser"></i> {{localize "AGENTICDJ.Settings.ClearKeys"}}</button>
   </footer>
 </div>

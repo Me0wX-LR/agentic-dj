@@ -2,6 +2,26 @@ export const MODULE_ID = "agentic-dj";
 export const FLAG_SCOPE = "agentic-dj";
 export const FLAG_CARD = "card";
 
+/**
+ * Shipped defaults. Sampling numbers are for a tool-using DJ, not a creative writer.
+ * See README "Default values" for the engineering rationale.
+ */
+export const DEFAULTS = {
+  llmProvider: "openrouter",
+  llmBaseUrl: "https://openrouter.ai/api/v1",
+  llmModel: "openai/gpt-4o-mini",
+  llmTemperature: 0.4,
+  llmMaxTokens: 900,
+  llmTopP: 1,
+  sttProvider: "webspeech",
+  sttBaseUrl: "",
+  sttModel: "whisper-1",
+  extraInstructions: "",
+  autoAnalyze: true,
+  cooldown: 20,
+  maxProposals: 3
+};
+
 export const LLM_PRESETS = {
   openrouter: {
     label: "OpenRouter",

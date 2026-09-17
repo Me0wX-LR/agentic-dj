@@ -1,8 +1,13 @@
-import { LLM_PRESETS, MODULE_ID, STT_PRESETS } from "./constants.js";
+import { DEFAULTS, LLM_PRESETS, MODULE_ID, STT_PRESETS } from "./constants.js";
 import { AgenticDjSettings } from "./ui/settings-app.js";
 
 export function setting(key) {
   return game.settings.get(MODULE_ID, key);
+}
+
+export function numericSetting(key, fallback) {
+  const value = Number(setting(key));
+  return Number.isFinite(value) ? value : fallback;
 }
 
 export function registerSettings() {
@@ -18,23 +23,23 @@ export function registerSettings() {
   const client = { scope: "client", config: false };
   const world = { scope: "world", config: false };
 
-  game.settings.register(MODULE_ID, "llmProvider", { ...client, type: String, default: "openrouter" });
-  game.settings.register(MODULE_ID, "llmBaseUrl", { ...client, type: String, default: LLM_PRESETS.openrouter.baseUrl });
-  game.settings.register(MODULE_ID, "llmModel", { ...client, type: String, default: LLM_PRESETS.openrouter.model });
+  game.settings.register(MODULE_ID, "llmProvider", { ...client, type: String, default: DEFAULTS.llmProvider });
+  game.settings.register(MODULE_ID, "llmBaseUrl", { ...client, type: String, default: DEFAULTS.llmBaseUrl });
+  game.settings.register(MODULE_ID, "llmModel", { ...client, type: String, default: DEFAULTS.llmModel });
   game.settings.register(MODULE_ID, "llmApiKey", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "llmApiKeyHint", { ...client, type: String, default: "" });
-  game.settings.register(MODULE_ID, "sttProvider", { ...client, type: String, default: "webspeech" });
-  game.settings.register(MODULE_ID, "sttBaseUrl", { ...client, type: String, default: "" });
-  game.settings.register(MODULE_ID, "sttModel", { ...client, type: String, default: STT_PRESETS.whisper.model });
+  game.settings.register(MODULE_ID, "sttProvider", { ...client, type: String, default: DEFAULTS.sttProvider });
+  game.settings.register(MODULE_ID, "sttBaseUrl", { ...client, type: String, default: DEFAULTS.sttBaseUrl });
+  game.settings.register(MODULE_ID, "sttModel", { ...client, type: String, default: DEFAULTS.sttModel });
   game.settings.register(MODULE_ID, "sttApiKey", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "sttApiKeyHint", { ...client, type: String, default: "" });
-  game.settings.register(MODULE_ID, "extraInstructions", { ...world, type: String, default: "" });
-  game.settings.register(MODULE_ID, "llmTemperature", { ...client, type: Number, default: 0.4 });
-  game.settings.register(MODULE_ID, "llmMaxTokens", { ...client, type: Number, default: 900 });
-  game.settings.register(MODULE_ID, "llmTopP", { ...client, type: Number, default: 1 });
-  game.settings.register(MODULE_ID, "autoAnalyze", { ...world, type: Boolean, default: true });
-  game.settings.register(MODULE_ID, "cooldown", { ...world, type: Number, default: 20 });
-  game.settings.register(MODULE_ID, "maxProposals", { ...world, type: Number, default: 3 });
+  game.settings.register(MODULE_ID, "extraInstructions", { ...world, type: String, default: DEFAULTS.extraInstructions });
+  game.settings.register(MODULE_ID, "llmTemperature", { ...client, type: Number, default: DEFAULTS.llmTemperature });
+  game.settings.register(MODULE_ID, "llmMaxTokens", { ...client, type: Number, default: DEFAULTS.llmMaxTokens });
+  game.settings.register(MODULE_ID, "llmTopP", { ...client, type: Number, default: DEFAULTS.llmTopP });
+  game.settings.register(MODULE_ID, "autoAnalyze", { ...world, type: Boolean, default: DEFAULTS.autoAnalyze });
+  game.settings.register(MODULE_ID, "cooldown", { ...world, type: Number, default: DEFAULTS.cooldown });
+  game.settings.register(MODULE_ID, "maxProposals", { ...world, type: Number, default: DEFAULTS.maxProposals });
   game.settings.register(MODULE_ID, "learnedMemory", { ...world, type: Object, default: {} });
 }
 
@@ -47,9 +52,9 @@ export function llmConfig() {
     model: setting("llmModel") || preset.model,
     apiKey: setting("llmApiKey") || "",
     extraInstructions: setting("extraInstructions") || "",
-    temperature: clamp(Number(setting("llmTemperature") ?? 0.4), 0, 2),
-    maxTokens: Math.round(clamp(Number(setting("llmMaxTokens") ?? 900), 64, 4000)),
-    topP: clamp(Number(setting("llmTopP") ?? 1), 0, 1)
+    temperature: clamp(numericSetting("llmTemperature", DEFAULTS.llmTemperature), 0, 2),
+    maxTokens: Math.round(clamp(numericSetting("llmMaxTokens", DEFAULTS.llmMaxTokens), 64, 4000)),
+    topP: clamp(numericSetting("llmTopP", DEFAULTS.llmTopP), 0, 1)
   };
 }
 

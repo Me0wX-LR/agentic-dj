@@ -80,6 +80,17 @@ test("learned likes boost a track in that mood", () => {
   assert.ok(ranked.find(row => row.track.soundId === "c").score > scoreTrack(drone, situation, {}).score);
 });
 
+test("shipped defaults match the documented DJ sampling", async () => {
+  const { DEFAULTS } = await import("../src/constants.js");
+  assert.equal(DEFAULTS.llmTemperature, 0.4);
+  assert.equal(DEFAULTS.llmMaxTokens, 900);
+  assert.equal(DEFAULTS.llmTopP, 1);
+  assert.equal(DEFAULTS.cooldown, 20);
+  assert.equal(DEFAULTS.maxProposals, 3);
+  assert.equal(DEFAULTS.autoAnalyze, true);
+  assert.equal(DEFAULTS.llmProvider, "openrouter");
+});
+
 test("memory markdown lists likes and bans", async () => {
   const { renderMemoryMarkdown } = await import("../src/memory/markdown.js");
   const md = renderMemoryMarkdown({
