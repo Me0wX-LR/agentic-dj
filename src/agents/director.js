@@ -72,8 +72,9 @@ export class Director {
         content: `You are the Director agent of Agentic DJ for Foundry VTT.
 Decompose the live situation into mood, intensity, and constraints.
 Use tools to search and verify the music catalog. Never invent soundIds.
-Finish by calling propose_cues with 2-3 options. Do not play audio.
-If recovering from a GM skip/ban, do not reuse those tracks.${extraSystem()}`
+        Finish by calling propose_cues with 2-3 options. Do not play audio.
+If recovering from a GM skip/ban, do not reuse those tracks.
+Respect learned likes/avoids from memory.md.${extraSystem()}`
       },
       {
         role: "user",
@@ -88,7 +89,7 @@ If recovering from a GM skip/ban, do not reuse those tracks.${extraSystem()}`
 
     let proposal = null;
     for (let step = 0; step < 6; step++) {
-      const message = await chatComplete({ messages, tools: DIRECTOR_TOOLS, temperature: 0.3 });
+      const message = await chatComplete({ messages, tools: DIRECTOR_TOOLS });
       messages.push(message);
       const calls = message.tool_calls ?? [];
       if (!calls.length) {

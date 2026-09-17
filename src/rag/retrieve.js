@@ -81,9 +81,20 @@ export function scoreTrack(track, situation, memory = {}) {
     score -= (recent.length - recentIndex) * 2;
     reasons.push("recently played");
   }
-  if (skipped.has(track.soundId)) {
-    score -= 3;
-    reasons.push("skipped earlier");
+
+  const likeCount = memory.likes?.[wantedMood]?.[track.soundId]?.count
+    ?? memory.likes?.general?.[track.soundId]?.count
+    ?? 0;
+  const dislikeCount = memory.dislikes?.[wantedMood]?.[track.soundId]?.count
+    ?? memory.dislikes?.general?.[track.soundId]?.count
+    ?? 0;
+  if (likeCount) {
+    score += likeCount * 2;
+    reasons.push(`learned like ×${likeCount}`);
+  }
+  if (dislikeCount) {
+    score -= dislikeCount * 2;
+    reasons.push(`learned avoid ×${dislikeCount}`);
   }
 
   return { score, reasons };

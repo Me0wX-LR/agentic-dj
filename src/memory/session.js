@@ -1,62 +1,153 @@
 import { MODULE_ID } from "../constants.js";
+import { inferWantedMood } from "../rag/retrieve.js";
+import { renderMemoryMarkdown } from "./markdown.js";
 
-const MEMORY_KEY = `${MODULE_ID}.session`;
+const SESSION_KEY = `${MODULE_ID}.session`;
+const SETTING_KEY = "learnedMemory";
 
-function emptyMemory() {
+function emptyState() {
   return {
     recentIds: [],
     skippedIds: [],
     bannedIds: [],
-    acceptReasons: [],
-    rejectReasons: []
+    banned: [],
+    likes: {},
+    dislikes: {},
+    events: []
   };
+}
+
+export function memoryDir() {
+  return `worlds/${game.world.id}/agentic-dj`;
+}
+
+export function memoryPath() {
+  return `${memoryDir()}/memory.md`;
 }
 
 export class SessionMemory {
   constructor() {
-    this.data = emptyMemory();
+    this.data = emptyState();
+    this._writeTimer = null;
   }
 
   snapshot() {
     return foundry.utils.deepClone(this.data);
   }
 
-  markPlayed(soundId, why = "") {
-    this.data.recentIds = [soundId, ...this.data.recentIds.filter(id => id !== soundId)].slice(0, 12);
-    if (why) this.data.acceptReasons.unshift({ soundId, why, at: Date.now() });
-    this.data.acceptReasons = this.data.acceptReasons.slice(0, 20);
-    this.#persist();
+  summary() {
+    return {
+      likes: this.data.likes,
+      dislikes: this.data.dislikes,
+      bannedIds: this.data.bannedIds,
+      recentIds: this.data.recentIds.slice(0, 6)
+    };
   }
 
-  skip(soundId, why = "") {
-    if (!this.data.skippedIds.includes(soundId)) this.data.skippedIds.push(soundId);
-    this.data.rejectReasons.unshift({ soundId, why, at: Date.now(), kind: "skip" });
-    this.data.rejectReasons = this.data.rejectReasons.slice(0, 20);
-    this.#persist();
-  }
-
-  ban(soundId, why = "") {
-    if (!this.data.bannedIds.includes(soundId)) this.data.bannedIds.push(soundId);
-    this.data.rejectReasons.unshift({ soundId, why, at: Date.now(), kind: "ban" });
-    this.data.rejectReasons = this.data.rejectReasons.slice(0, 20);
-    this.#persist();
-  }
-
-  load() {
-    const saved = sessionStorage.getItem(MEMORY_KEY);
-    if (!saved) return;
-    try {
-      this.data = { ...emptyMemory(), ...JSON.parse(saved) };
-    } catch (err) {
-      console.warn(`${MODULE_ID} | could not restore session memory`, err);
+  async load() {
+    const fromWorld = game.settings.get(MODULE_ID, SETTING_KEY);
+    if (fromWorld && typeof fromWorld === "object" && Object.keys(fromWorld).length) {
+      this.data = { ...emptyState(), ...fromWorld, skippedIds: [] };
+    }
+    const session = sessionStorage.getItem(SESSION_KEY);
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        this.data.skippedIds = parsed.skippedIds ?? [];
+        if (!this.data.recentIds.length && parsed.recentIds) this.data.recentIds = parsed.recentIds;
+      } catch {
+        // ignore
+      }
     }
   }
 
-  #persist() {
+  async record(action, { soundId, name = "", mood = "", scene = "", why = "" } = {}) {
+    const event = { action, soundId, name, mood, scene, why, at: Date.now() };
+    this.data.events.unshift(event);
+    this.data.events = this.data.events.slice(0, 100);
+
+    if (action === "play") {
+      this.data.recentIds = [soundId, ...this.data.recentIds.filter(id => id !== soundId)].slice(0, 12);
+      this.data.skippedIds = this.data.skippedIds.filter(id => id !== soundId);
+      bump(this.data.likes, mood || "general", soundId, name);
+    } else if (action === "skip") {
+      if (!this.data.skippedIds.includes(soundId)) this.data.skippedIds.push(soundId);
+      bump(this.data.dislikes, mood || "general", soundId, name);
+    } else if (action === "ban") {
+      if (!this.data.bannedIds.includes(soundId)) this.data.bannedIds.push(soundId);
+      if (!this.data.banned.some(row => row.soundId === soundId)) {
+        this.data.banned.push({ soundId, name, at: Date.now() });
+      }
+      bump(this.data.dislikes, mood || "general", soundId, name);
+    }
+    await this.persist();
+  }
+
+  async forget() {
+    this.data = emptyState();
+    await this.persist();
+  }
+
+  async persist() {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+      skippedIds: this.data.skippedIds,
+      recentIds: this.data.recentIds
+    }));
+    await game.settings.set(MODULE_ID, SETTING_KEY, this.snapshot());
+    clearTimeout(this._writeTimer);
+    this._writeTimer = setTimeout(() => {
+      this.writeMarkdown().catch(err => console.warn(`${MODULE_ID} | memory.md write failed`, err));
+    }, 250);
+  }
+
+  toMarkdown() {
+    return renderMemoryMarkdown({
+      worldName: game.world?.title || game.world?.id,
+      updatedAt: Date.now(),
+      likes: this.data.likes,
+      dislikes: this.data.dislikes,
+      banned: this.data.banned,
+      events: this.data.events,
+      path: memoryPath()
+    });
+  }
+
+  async writeMarkdown() {
+    const dir = memoryDir();
+    const picker = filePickerClass();
     try {
-      sessionStorage.setItem(MEMORY_KEY, JSON.stringify(this.data));
+      await picker.createDirectory("data", dir, { notify: false });
     } catch {
-      // ignore quota
+      // directory already exists
     }
+    const file = new File([this.toMarkdown()], "memory.md", { type: "text/markdown" });
+    await picker.upload("data", dir, file, {}, { notify: false });
   }
+
+  async openMarkdown() {
+    await this.writeMarkdown();
+    const picker = filePickerClass();
+    const app = new picker({
+      type: "text",
+      current: memoryDir(),
+      callback: () => null
+    });
+    app.render({ force: true });
+  }
+}
+
+export function moodFromSituation(situation = {}, fallback = "") {
+  return inferWantedMood(situation) || fallback || "general";
+}
+
+function bump(map, mood, soundId, name) {
+  if (!soundId) return;
+  map[mood] ??= {};
+  map[mood][soundId] ??= { name, count: 0 };
+  map[mood][soundId].name = name || map[mood][soundId].name;
+  map[mood][soundId].count += 1;
+}
+
+function filePickerClass() {
+  return foundry.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
 }

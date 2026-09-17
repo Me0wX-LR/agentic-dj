@@ -72,3 +72,24 @@ test("recent plays are penalized", () => {
   const repeated = scoreTrack(battle, situation, { recentIds: ["b"] });
   assert.ok(repeated.score < fresh.score);
 });
+
+test("learned likes boost a track in that mood", () => {
+  const situation = { inCombat: true, transcript: "combat" };
+  const memory = { likes: { combat: { c: { name: "Cave Breath", count: 6 } } } };
+  const ranked = retrieveTracks([tavern, battle, drone], situation, memory, { limit: 3 });
+  assert.ok(ranked.find(row => row.track.soundId === "c").score > scoreTrack(drone, situation, {}).score);
+});
+
+test("memory markdown lists likes and bans", async () => {
+  const { renderMemoryMarkdown } = await import("../src/memory/markdown.js");
+  const md = renderMemoryMarkdown({
+    worldName: "Test World",
+    likes: { combat: { b: { name: "Steel Clash", count: 2 } } },
+    banned: [{ soundId: "x", name: "Nope" }],
+    events: [{ at: Date.now(), action: "play", name: "Steel Clash", mood: "combat", scene: "Gate", why: "fits" }],
+    path: "worlds/test/agentic-dj/memory.md"
+  });
+  assert.match(md, /Steel Clash/);
+  assert.match(md, /Nope/);
+  assert.match(md, /memory\.md/);
+});

@@ -22,7 +22,9 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
       skip: AgenticDjApp.onSkip,
       ban: AgenticDjApp.onBan,
       preview: AgenticDjApp.onPreview,
-      openSettings: AgenticDjApp.onOpenSettings
+      openSettings: AgenticDjApp.onOpenSettings,
+      openMemory: AgenticDjApp.onOpenMemory,
+      forgetMemory: AgenticDjApp.onForgetMemory
     }
   };
 
@@ -98,5 +100,17 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static async onPreview(_event, target) {
     await this.orchestrator.previewCue(target.dataset.soundId);
+  }
+
+  static async onOpenMemory() {
+    await this.orchestrator.openMemory();
+  }
+
+  static async onForgetMemory() {
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: game.i18n.localize("AGENTICDJ.Title") },
+      content: `<p>${game.i18n.localize("AGENTICDJ.MemoryClearConfirm")}</p>`
+    });
+    if (ok) await this.orchestrator.forgetMemory();
   }
 }

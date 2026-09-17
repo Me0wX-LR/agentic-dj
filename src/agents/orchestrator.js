@@ -1,6 +1,6 @@
 import { MODULE_ID } from "../constants.js";
 import { catalogStats } from "../rag/catalog.js";
-import { SessionMemory } from "../memory/session.js";
+import { SessionMemory, memoryPath, moodFromSituation } from "../memory/session.js";
 import { setting } from "../settings.js";
 import { playSoundById, previewSound, stopAllMusic } from "../tools/playlists.js";
 import { Director } from "./director.js";
@@ -10,7 +10,6 @@ import { Listener } from "./listener.js";
 export class Orchestrator {
   constructor() {
     this.memory = new SessionMemory();
-    this.memory.load();
     this.librarian = new Librarian();
     this.director = new Director(this.memory);
     this.listener = new Listener((brief, reason) => this.#onSituation(brief, reason));
@@ -22,7 +21,8 @@ export class Orchestrator {
     this.debounce = null;
   }
 
-  start() {
+  async start() {
+    await this.memory.load();
     this.listener.startHooks();
     this.situation = this.listener.brief();
     if (setting("autoAnalyze")) {
@@ -82,7 +82,13 @@ export class Orchestrator {
   async playCue(soundId) {
     const cue = this.proposal.cues.find(row => row.soundId === soundId);
     await playSoundById(soundId);
-    this.memory.markPlayed(soundId, cue?.why ?? "");
+    await this.memory.record("play", {
+      soundId,
+      name: cue?.name,
+      mood: moodFromSituation(this.situation, cue?.mood),
+      scene: this.situation.sceneName,
+      why: cue?.why ?? ""
+    });
     this.status = "playing";
     ui.notifications.info(game.i18n.localize("AGENTICDJ.Played"));
     this.refreshUi();
@@ -93,15 +99,39 @@ export class Orchestrator {
   }
 
   async skipCue(soundId) {
-    this.memory.skip(soundId, "gm-skip");
+    const cue = this.proposal.cues.find(row => row.soundId === soundId);
+    await this.memory.record("skip", {
+      soundId,
+      name: cue?.name,
+      mood: moodFromSituation(this.situation, cue?.mood),
+      scene: this.situation.sceneName,
+      why: "gm-skip"
+    });
     ui.notifications.info(game.i18n.localize("AGENTICDJ.Rejected"));
     await this.suggestNow({ recoverFrom: { soundId, action: "skip" } });
   }
 
   async banCue(soundId) {
-    this.memory.ban(soundId, "gm-ban");
+    const cue = this.proposal.cues.find(row => row.soundId === soundId);
+    await this.memory.record("ban", {
+      soundId,
+      name: cue?.name,
+      mood: moodFromSituation(this.situation, cue?.mood),
+      scene: this.situation.sceneName,
+      why: "gm-ban"
+    });
     ui.notifications.info(game.i18n.localize("AGENTICDJ.Banned"));
     await this.suggestNow({ recoverFrom: { soundId, action: "ban" } });
+  }
+
+  async openMemory() {
+    await this.memory.openMarkdown();
+  }
+
+  async forgetMemory() {
+    await this.memory.forget();
+    ui.notifications.info(game.i18n.localize("AGENTICDJ.MemoryCleared"));
+    this.refreshUi();
   }
 
   async stopMusic() {
@@ -116,7 +146,8 @@ export class Orchestrator {
       listening: this.listener.listening,
       status: this.status,
       catalog: catalogStats(),
-      memory: this.memory.snapshot()
+      memory: this.memory.snapshot(),
+      memoryPath: memoryPath()
     };
   }
 

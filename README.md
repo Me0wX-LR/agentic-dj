@@ -36,6 +36,8 @@ Configure keys under **Game Settings → Agentic DJ Providers**. Keys stay in th
 
 Without an LLM key, local audio tags and the ranker still work. The Director LLM path adds planning, tool use, and verification.
 
+LLM sampling lives in the same Configure window: **temperature**, **max tokens**, and **top P**.
+
 ### STT
 
 - **Web Speech API** — no key, Chrome/Edge
@@ -51,7 +53,17 @@ Without an LLM key, local audio tags and the ranker still work. The Director LLM
 5. **Skip** one suggestion. The Director recovers with a different track and remembers the skip.
 6. **Play** a cue. Confirm the dialog. The table hears Foundry playlist playback.
 
-That path is planning, tool selection (`search_catalog` / `verify_candidates` / `propose_cues`), multi-step execution, catalog verification, Foundry environment I/O, session memory, and skip recovery. Three agents: Librarian, Listener, Director.
+That path is planning, tool selection (`search_catalog` / `verify_candidates` / `propose_cues`), multi-step execution, catalog verification, Foundry environment I/O, persistent `memory.md`, and skip recovery. Three agents: Librarian, Listener, Director.
+
+## Memory / learning
+
+Play, Skip, and Never teach the Director. Taste is stored in the world (survives reload) and written to:
+
+```
+worlds/<your-world>/agentic-dj/memory.md
+```
+
+On disk that is `FoundryVTT/Data/worlds/<your-world>/agentic-dj/memory.md`. Open it from the Agentic DJ panel. Likes raise a track in similar moods; skips lower it; bans hide it until you forget memory.
 
 ## Optional: Audio Tagger
 

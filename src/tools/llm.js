@@ -11,14 +11,18 @@ function headers(cfg) {
   return h;
 }
 
-export async function chatComplete({ messages, tools, toolChoice = "auto", temperature = 0.4, json = false }) {
+export async function chatComplete({ messages, tools, toolChoice = "auto", temperature, maxTokens, topP, json = false }) {
   const cfg = llmConfig();
   if (!cfg.baseUrl) throw new Error("LLM base URL is empty");
   const body = {
     model: cfg.model,
     messages,
-    temperature
+    temperature: temperature ?? cfg.temperature
   };
+  const tokenLimit = maxTokens ?? cfg.maxTokens;
+  if (tokenLimit) body.max_tokens = tokenLimit;
+  const nucleus = topP ?? cfg.topP;
+  if (nucleus !== undefined && nucleus !== null && Number(nucleus) < 1) body.top_p = Number(nucleus);
   if (tools?.length) {
     body.tools = tools;
     body.tool_choice = toolChoice;

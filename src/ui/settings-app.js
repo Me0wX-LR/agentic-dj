@@ -22,7 +22,7 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
       icon: "fa-solid fa-key",
       contentClasses: ["standard-form"]
     },
-    position: { width: 560 },
+    position: { width: 560, height: 720 },
     actions: {
       save: AgenticDjSettings.onSave,
       clearKeys: AgenticDjSettings.onClearKeys
@@ -58,6 +58,9 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
       sttBaseUrl: game.settings.get(MODULE_ID, "sttBaseUrl"),
       sttModel: game.settings.get(MODULE_ID, "sttModel"),
       extraInstructions: game.settings.get(MODULE_ID, "extraInstructions"),
+      llmTemperature: game.settings.get(MODULE_ID, "llmTemperature"),
+      llmMaxTokens: game.settings.get(MODULE_ID, "llmMaxTokens"),
+      llmTopP: game.settings.get(MODULE_ID, "llmTopP"),
       autoAnalyze: game.settings.get(MODULE_ID, "autoAnalyze"),
       cooldown: game.settings.get(MODULE_ID, "cooldown"),
       maxProposals: game.settings.get(MODULE_ID, "maxProposals"),
@@ -128,6 +131,12 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
     await game.settings.set(MODULE_ID, "sttBaseUrl", readValue(root, "sttBaseUrl"));
     await game.settings.set(MODULE_ID, "sttModel", readValue(root, "sttModel"));
     await game.settings.set(MODULE_ID, "extraInstructions", root.querySelector('[name="extraInstructions"]')?.value ?? "");
+    const temperature = Number(readValue(root, "llmTemperature") || 0.4);
+    const maxTokens = Number(readValue(root, "llmMaxTokens") || 900);
+    const topP = Number(readValue(root, "llmTopP") || 1);
+    await game.settings.set(MODULE_ID, "llmTemperature", Number.isFinite(temperature) ? temperature : 0.4);
+    await game.settings.set(MODULE_ID, "llmMaxTokens", Number.isFinite(maxTokens) ? maxTokens : 900);
+    await game.settings.set(MODULE_ID, "llmTopP", Number.isFinite(topP) ? topP : 1);
     await game.settings.set(MODULE_ID, "autoAnalyze", autoAnalyze);
     await game.settings.set(MODULE_ID, "cooldown", Number.isFinite(cooldown) ? cooldown : 20);
     await game.settings.set(MODULE_ID, "maxProposals", Number.isFinite(maxProposals) ? maxProposals : 3);

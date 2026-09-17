@@ -53,6 +53,11 @@
       <div>
         <h3>{{localize "AGENTICDJ.Memory"}}</h3>
         <p>Played {{memory.recentIds.length}} · Skipped {{memory.skippedIds.length}} · Banned {{memory.bannedIds.length}}</p>
+        <p class="agentic-dj-meta">{{memoryPath}}</p>
+        <p class="flexrow" style="gap:0.35rem;">
+          <button type="button" data-action="openMemory">{{localize "AGENTICDJ.OpenMemory"}}</button>
+          <button type="button" data-action="forgetMemory">{{localize "AGENTICDJ.ForgetMemory"}}</button>
+        </p>
       </div>
     </section>
   </div>

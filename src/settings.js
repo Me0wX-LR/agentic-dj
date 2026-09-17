@@ -29,9 +29,13 @@ export function registerSettings() {
   game.settings.register(MODULE_ID, "sttApiKey", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "sttApiKeyHint", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "extraInstructions", { ...world, type: String, default: "" });
+  game.settings.register(MODULE_ID, "llmTemperature", { ...client, type: Number, default: 0.4 });
+  game.settings.register(MODULE_ID, "llmMaxTokens", { ...client, type: Number, default: 900 });
+  game.settings.register(MODULE_ID, "llmTopP", { ...client, type: Number, default: 1 });
   game.settings.register(MODULE_ID, "autoAnalyze", { ...world, type: Boolean, default: true });
   game.settings.register(MODULE_ID, "cooldown", { ...world, type: Number, default: 20 });
   game.settings.register(MODULE_ID, "maxProposals", { ...world, type: Number, default: 3 });
+  game.settings.register(MODULE_ID, "learnedMemory", { ...world, type: Object, default: {} });
 }
 
 export function llmConfig() {
@@ -42,7 +46,10 @@ export function llmConfig() {
     baseUrl: (setting("llmBaseUrl") || preset.baseUrl || "").replace(/\/$/, ""),
     model: setting("llmModel") || preset.model,
     apiKey: setting("llmApiKey") || "",
-    extraInstructions: setting("extraInstructions") || ""
+    extraInstructions: setting("extraInstructions") || "",
+    temperature: clamp(Number(setting("llmTemperature") ?? 0.4), 0, 2),
+    maxTokens: Math.round(clamp(Number(setting("llmMaxTokens") ?? 900), 64, 4000)),
+    topP: clamp(Number(setting("llmTopP") ?? 1), 0, 1)
   };
 }
 
@@ -61,4 +68,9 @@ export function hasLlmKey() {
   const cfg = llmConfig();
   if (cfg.provider === "ollama") return Boolean(cfg.baseUrl);
   return Boolean(cfg.apiKey && cfg.baseUrl && cfg.model);
+}
+
+function clamp(value, min, max) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
 }
