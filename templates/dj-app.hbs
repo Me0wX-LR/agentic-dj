@@ -7,7 +7,11 @@
     <button type="button" data-action="suggest"><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.SuggestNow"}}</button>
     <button type="button" data-action="analyze"><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.AnalyzeLibrary"}}</button>
     <button type="button" data-action="stop"><i class="fa-solid fa-stop"></i> {{localize "AGENTICDJ.StopMusic"}}</button>
+    <button type="button" data-action="openSettings"><i class="fa-solid fa-key"></i> {{localize "AGENTICDJ.SettingsMenuLabel"}}</button>
   </header>
+  <p class="agentic-dj-keystatus">
+    {{#if hasLlmKey}}{{localize "AGENTICDJ.Settings.KeySaved"}} {{llmKeyHint}}{{else}}{{localize "AGENTICDJ.NeedsKey"}}{{/if}}
+  </p>
 
   <div class="agentic-dj-body">
     <section class="agentic-dj-card">

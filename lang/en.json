@@ -41,7 +41,15 @@
       "AutoAnalyze": "Analyze new tracks automatically",
       "Cooldown": "Suggestion cooldown (seconds)",
       "MaxProposals": "Max proposals",
-      "Save": "Save"
+      "Save": "Save",
+      "ClearKeys": "Clear saved keys",
+      "KeySaved": "Saved on this computer:",
+      "KeyMissing": "No key saved yet. Paste one and click Save. Keys never leave this browser.",
+      "KeyPlaceholderNew": "Paste API key",
+      "KeyPlaceholderSaved": "Leave blank to keep the saved key",
+      "SaveOk": "Agentic DJ saved your provider settings and API key on this computer.",
+      "SaveOkNoKey": "Settings saved. Paste an LLM API key and Save again to enable the Director model.",
+      "KeysCleared": "Saved API keys were removed from this computer."
     },
     "Notify": {
       "Ready": "Agentic DJ is ready. Open it from the Playlists directory header."

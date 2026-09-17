@@ -22,10 +22,12 @@ export function registerSettings() {
   game.settings.register(MODULE_ID, "llmBaseUrl", { ...client, type: String, default: LLM_PRESETS.openrouter.baseUrl });
   game.settings.register(MODULE_ID, "llmModel", { ...client, type: String, default: LLM_PRESETS.openrouter.model });
   game.settings.register(MODULE_ID, "llmApiKey", { ...client, type: String, default: "" });
+  game.settings.register(MODULE_ID, "llmApiKeyHint", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "sttProvider", { ...client, type: String, default: "webspeech" });
   game.settings.register(MODULE_ID, "sttBaseUrl", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "sttModel", { ...client, type: String, default: STT_PRESETS.whisper.model });
   game.settings.register(MODULE_ID, "sttApiKey", { ...client, type: String, default: "" });
+  game.settings.register(MODULE_ID, "sttApiKeyHint", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "extraInstructions", { ...world, type: String, default: "" });
   game.settings.register(MODULE_ID, "autoAnalyze", { ...world, type: Boolean, default: true });
   game.settings.register(MODULE_ID, "cooldown", { ...world, type: Number, default: 20 });

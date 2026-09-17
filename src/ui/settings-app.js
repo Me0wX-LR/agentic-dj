@@ -2,20 +2,30 @@ import { LLM_PRESETS, MODULE_ID, STT_PRESETS } from "../constants.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
+function keyHint(value) {
+  const text = String(value || "");
+  if (!text) return "";
+  return text.length <= 4 ? "••••" : `•••• ${text.slice(-4)}`;
+}
+
+function readValue(root, name) {
+  return root.querySelector(`[name="${name}"]`)?.value?.trim?.() ?? "";
+}
+
 export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: "agentic-dj-settings",
-    tag: "form",
-    classes: ["agentic-dj", "standard-form"],
+    classes: ["agentic-dj"],
+    tag: "div",
     window: {
       title: "AGENTICDJ.SettingsMenu",
       icon: "fa-solid fa-key",
       contentClasses: ["standard-form"]
     },
     position: { width: 560 },
-    form: {
-      handler: AgenticDjSettings.#onSubmit,
-      closeOnSubmit: true
+    actions: {
+      save: AgenticDjSettings.onSave,
+      clearKeys: AgenticDjSettings.onClearKeys
     }
   };
 
@@ -23,60 +33,128 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
     body: { template: `modules/${MODULE_ID}/templates/settings.hbs` }
   };
 
-  async _prepareContext() {
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
     const llmProvider = game.settings.get(MODULE_ID, "llmProvider");
     const sttProvider = game.settings.get(MODULE_ID, "sttProvider");
+    const llmApiKey = game.settings.get(MODULE_ID, "llmApiKey") || "";
+    const sttApiKey = game.settings.get(MODULE_ID, "sttApiKey") || "";
     return {
+      ...context,
       llmProvider,
-      llmProviders: Object.entries(LLM_PRESETS).map(([id, preset]) => ({ id, label: preset.label, selected: id === llmProvider })),
-      sttProviders: Object.entries(STT_PRESETS).map(([id, preset]) => ({ id, label: preset.label, selected: id === sttProvider })),
+      llmProviders: Object.entries(LLM_PRESETS).map(([id, preset]) => ({
+        id,
+        label: preset.label,
+        selected: id === llmProvider
+      })),
+      sttProviders: Object.entries(STT_PRESETS).map(([id, preset]) => ({
+        id,
+        label: preset.label,
+        selected: id === sttProvider
+      })),
       llmBaseUrl: game.settings.get(MODULE_ID, "llmBaseUrl"),
       llmModel: game.settings.get(MODULE_ID, "llmModel"),
-      llmApiKey: game.settings.get(MODULE_ID, "llmApiKey"),
       sttProvider,
       sttBaseUrl: game.settings.get(MODULE_ID, "sttBaseUrl"),
       sttModel: game.settings.get(MODULE_ID, "sttModel"),
-      sttApiKey: game.settings.get(MODULE_ID, "sttApiKey"),
       extraInstructions: game.settings.get(MODULE_ID, "extraInstructions"),
       autoAnalyze: game.settings.get(MODULE_ID, "autoAnalyze"),
       cooldown: game.settings.get(MODULE_ID, "cooldown"),
       maxProposals: game.settings.get(MODULE_ID, "maxProposals"),
-      presets: LLM_PRESETS
+      hasLlmKey: Boolean(llmApiKey),
+      hasSttKey: Boolean(sttApiKey),
+      llmKeyHint: game.settings.get(MODULE_ID, "llmApiKeyHint") || keyHint(llmApiKey),
+      sttKeyHint: game.settings.get(MODULE_ID, "sttApiKeyHint") || keyHint(sttApiKey),
+      llmKeyPlaceholder: llmApiKey
+        ? game.i18n.localize("AGENTICDJ.Settings.KeyPlaceholderSaved")
+        : game.i18n.localize("AGENTICDJ.Settings.KeyPlaceholderNew"),
+      sttKeyPlaceholder: sttApiKey
+        ? game.i18n.localize("AGENTICDJ.Settings.KeyPlaceholderSaved")
+        : game.i18n.localize("AGENTICDJ.Settings.KeyPlaceholderNew")
     };
   }
 
-  _onRender(context, options) {
-    super._onRender?.(context, options);
-    this.element.querySelector('[name="llmProvider"]')?.addEventListener("change", event => {
-      const preset = LLM_PRESETS[event.currentTarget.value];
-      if (!preset) return;
-      const url = this.element.querySelector('[name="llmBaseUrl"]');
-      const model = this.element.querySelector('[name="llmModel"]');
-      if (preset.baseUrl && url) url.value = preset.baseUrl;
-      if (preset.model && model) model.value = preset.model;
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    if (this._djSettingsBound) return;
+    this._djSettingsBound = true;
+    const root = this.element;
+    root.addEventListener("submit", event => {
+      event.preventDefault();
+      event.stopPropagation();
     });
-    this.element.querySelector('[name="sttProvider"]')?.addEventListener("change", event => {
-      const preset = STT_PRESETS[event.currentTarget.value];
-      if (!preset) return;
-      const url = this.element.querySelector('[name="sttBaseUrl"]');
-      const model = this.element.querySelector('[name="sttModel"]');
-      if (preset.baseUrl && url) url.value = preset.baseUrl;
-      if (preset.model && model) model.value = preset.model;
+    root.addEventListener("keydown", event => {
+      if (event.key !== "Enter") return;
+      if (event.target?.tagName === "TEXTAREA") return;
+      event.preventDefault();
+      event.stopPropagation();
+      AgenticDjSettings.onSave.call(this, event);
+    });
+    root.addEventListener("change", event => {
+      const name = event.target?.name;
+      if (name === "llmProvider") {
+        const preset = LLM_PRESETS[event.target.value];
+        if (!preset) return;
+        const url = root.querySelector('[name="llmBaseUrl"]');
+        const model = root.querySelector('[name="llmModel"]');
+        if (preset.baseUrl && url) url.value = preset.baseUrl;
+        if (preset.model && model) model.value = preset.model;
+      }
+      if (name === "sttProvider") {
+        const preset = STT_PRESETS[event.target.value];
+        if (!preset) return;
+        const url = root.querySelector('[name="sttBaseUrl"]');
+        const model = root.querySelector('[name="sttModel"]');
+        if (preset.baseUrl && url) url.value = preset.baseUrl;
+        if (preset.model && model) model.value = preset.model;
+      }
     });
   }
 
-  static async #onSubmit(_event, form, formData) {
-    const data = formData.object;
-    const keys = [
-      "llmProvider", "llmBaseUrl", "llmModel", "llmApiKey",
-      "sttProvider", "sttBaseUrl", "sttModel", "sttApiKey",
-      "extraInstructions", "autoAnalyze", "cooldown", "maxProposals"
-    ];
-    for (const key of keys) {
-      let value = data[key];
-      if (key === "autoAnalyze") value = value === true || value === "true" || value === "on";
-      if (key === "cooldown" || key === "maxProposals") value = Number(value);
-      await game.settings.set(MODULE_ID, key, value ?? (key === "autoAnalyze" ? false : ""));
+  static async onSave(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const root = this.element;
+    const llmKey = readValue(root, "llmApiKey");
+    const sttKey = readValue(root, "sttApiKey");
+    const autoAnalyze = Boolean(root.querySelector('[name="autoAnalyze"]')?.checked);
+    const cooldown = Number(readValue(root, "cooldown") || 20);
+    const maxProposals = Number(readValue(root, "maxProposals") || 3);
+
+    await game.settings.set(MODULE_ID, "llmProvider", readValue(root, "llmProvider") || "openrouter");
+    await game.settings.set(MODULE_ID, "llmBaseUrl", readValue(root, "llmBaseUrl"));
+    await game.settings.set(MODULE_ID, "llmModel", readValue(root, "llmModel"));
+    await game.settings.set(MODULE_ID, "sttProvider", readValue(root, "sttProvider") || "webspeech");
+    await game.settings.set(MODULE_ID, "sttBaseUrl", readValue(root, "sttBaseUrl"));
+    await game.settings.set(MODULE_ID, "sttModel", readValue(root, "sttModel"));
+    await game.settings.set(MODULE_ID, "extraInstructions", root.querySelector('[name="extraInstructions"]')?.value ?? "");
+    await game.settings.set(MODULE_ID, "autoAnalyze", autoAnalyze);
+    await game.settings.set(MODULE_ID, "cooldown", Number.isFinite(cooldown) ? cooldown : 20);
+    await game.settings.set(MODULE_ID, "maxProposals", Number.isFinite(maxProposals) ? maxProposals : 3);
+
+    if (llmKey) {
+      await game.settings.set(MODULE_ID, "llmApiKey", llmKey);
+      await game.settings.set(MODULE_ID, "llmApiKeyHint", keyHint(llmKey));
     }
+    if (sttKey) {
+      await game.settings.set(MODULE_ID, "sttApiKey", sttKey);
+      await game.settings.set(MODULE_ID, "sttApiKeyHint", keyHint(sttKey));
+    }
+
+    const stored = game.settings.get(MODULE_ID, "llmApiKey");
+    ui.notifications.info(stored
+      ? game.i18n.localize("AGENTICDJ.Settings.SaveOk")
+      : game.i18n.localize("AGENTICDJ.Settings.SaveOkNoKey"));
+    this.close();
+  }
+
+  static async onClearKeys(event) {
+    event?.preventDefault?.();
+    await game.settings.set(MODULE_ID, "llmApiKey", "");
+    await game.settings.set(MODULE_ID, "sttApiKey", "");
+    await game.settings.set(MODULE_ID, "llmApiKeyHint", "");
+    await game.settings.set(MODULE_ID, "sttApiKeyHint", "");
+    ui.notifications.info(game.i18n.localize("AGENTICDJ.Settings.KeysCleared"));
+    this.render();
   }
 }

@@ -32,6 +32,11 @@ export function attachControls(orchestrator) {
       return;
     }
     const group = controls.tokens ?? controls.token;
-    if (group?.tools) group.tools[MODULE_ID] = tool;
+    if (!group) return;
+    if (Array.isArray(group.tools)) {
+      if (!group.tools.some(entry => entry.name === MODULE_ID)) group.tools.push(tool);
+    } else if (group.tools && typeof group.tools === "object") {
+      group.tools[MODULE_ID] = tool;
+    }
   });
 }

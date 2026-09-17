@@ -1,11 +1,12 @@
 import { MODULE_ID } from "../constants.js";
+import { AgenticDjSettings } from "./settings-app.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: "agentic-dj-app",
-    classes: ["agentic-dj", "standard-form"],
+    classes: ["agentic-dj"],
     window: {
       title: "AGENTICDJ.Title",
       icon: "fa-solid fa-headphones",
@@ -13,14 +14,15 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     },
     position: { width: 560, height: 760 },
     actions: {
-      listen: AgenticDjApp.#onListen,
-      suggest: AgenticDjApp.#onSuggest,
-      analyze: AgenticDjApp.#onAnalyze,
-      stop: AgenticDjApp.#onStop,
-      play: AgenticDjApp.#onPlay,
-      skip: AgenticDjApp.#onSkip,
-      ban: AgenticDjApp.#onBan,
-      preview: AgenticDjApp.#onPreview
+      listen: AgenticDjApp.onListen,
+      suggest: AgenticDjApp.onSuggest,
+      analyze: AgenticDjApp.onAnalyze,
+      stop: AgenticDjApp.onStop,
+      play: AgenticDjApp.onPlay,
+      skip: AgenticDjApp.onSkip,
+      ban: AgenticDjApp.onBan,
+      preview: AgenticDjApp.onPreview,
+      openSettings: AgenticDjApp.onOpenSettings
     }
   };
 
@@ -41,34 +43,43 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     return this._instance;
   }
 
-  async _prepareContext() {
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
     const snap = this.orchestrator.snapshot();
+    const llmKey = game.settings.get(MODULE_ID, "llmApiKey") || "";
     return {
+      ...context,
       ...snap,
       statusLabel: snap.status,
       hasCues: snap.proposal.cues.length > 0,
+      hasLlmKey: Boolean(llmKey),
+      llmKeyHint: game.settings.get(MODULE_ID, "llmApiKeyHint") || "",
       transcript: snap.situation.transcript || "No transcript yet.",
       playing: (snap.situation.playing ?? []).map(row => `${row.playlist}: ${row.tracks.join(", ")}`).join(" · ") || "Silent"
     };
   }
 
-  static async #onListen(_event, _target) {
+  static async onListen() {
     await this.orchestrator.toggleListen();
   }
 
-  static async #onSuggest() {
+  static async onSuggest() {
     await this.orchestrator.suggestNow();
   }
 
-  static async #onAnalyze() {
+  static async onAnalyze() {
     await this.orchestrator.analyzeLibrary(true);
   }
 
-  static async #onStop() {
+  static async onStop() {
     await this.orchestrator.stopMusic();
   }
 
-  static async #onPlay(_event, target) {
+  static onOpenSettings() {
+    new AgenticDjSettings().render({ force: true });
+  }
+
+  static async onPlay(_event, target) {
     const id = target.dataset.soundId;
     const ok = await foundry.applications.api.DialogV2.confirm({
       window: { title: game.i18n.localize("AGENTICDJ.Title") },
@@ -77,15 +88,15 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (ok) await this.orchestrator.playCue(id);
   }
 
-  static async #onSkip(_event, target) {
+  static async onSkip(_event, target) {
     await this.orchestrator.skipCue(target.dataset.soundId);
   }
 
-  static async #onBan(_event, target) {
+  static async onBan(_event, target) {
     await this.orchestrator.banCue(target.dataset.soundId);
   }
 
-  static async #onPreview(_event, target) {
+  static async onPreview(_event, target) {
     await this.orchestrator.previewCue(target.dataset.soundId);
   }
 }

@@ -21,6 +21,18 @@
   white-space: nowrap;
 }
 
+.agentic-dj-keystatus {
+  margin: 0;
+  padding: 0.35rem 0.75rem 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.agentic-dj-settings .hint,
+.agentic-dj-settings .notes {
+  opacity: 0.8;
+}
+
 .agentic-dj-toolbar button.active {
   background: #3a6d4b;
   color: #fff;
