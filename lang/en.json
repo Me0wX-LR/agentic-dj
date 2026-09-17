@@ -1,0 +1,50 @@
+{
+  "AGENTICDJ": {
+    "Title": "Agentic DJ",
+    "SettingsMenu": "Agentic DJ Providers",
+    "SettingsMenuHint": "Bring-your-own LLM and speech-to-text keys. Keys stay in this browser.",
+    "SettingsMenuLabel": "Configure",
+    "ControlTitle": "Open Agentic DJ",
+    "Listen": "Listen",
+    "Listening": "Listening",
+    "SuggestNow": "Suggest now",
+    "AnalyzeLibrary": "Analyze library",
+    "StopMusic": "Stop music",
+    "Play": "Play",
+    "Skip": "Skip",
+    "Ban": "Never",
+    "Preview": "Preview",
+    "Situation": "Situation",
+    "Suggestions": "Cue suggestions",
+    "Catalog": "Catalog",
+    "Memory": "Session memory",
+    "NoSuggestions": "No cues yet. Analyze tracks, then click Suggest now or start listening.",
+    "NoTracks": "No playlist sounds found. Add music in the Playlists directory first.",
+    "Analyzing": "Librarian is analyzing audio…",
+    "Analyzed": "Analyzed {count} tracks",
+    "NeedsKey": "No LLM key configured. Local audio tags still work; richer cards need a BYOK model.",
+    "PlayConfirm": "Play this cue for the table?",
+    "Rejected": "Skipped. Director is recovering…",
+    "Banned": "Banned for this session.",
+    "Played": "Now playing for the table.",
+    "MicDenied": "Microphone permission was denied.",
+    "Settings": {
+      "LlmProvider": "LLM provider",
+      "LlmBaseUrl": "LLM base URL",
+      "LlmModel": "LLM model",
+      "LlmApiKey": "LLM API key",
+      "SttProvider": "STT provider",
+      "SttBaseUrl": "STT base URL",
+      "SttModel": "STT model",
+      "SttApiKey": "STT API key",
+      "ExtraInstructions": "Extra DJ instructions",
+      "AutoAnalyze": "Analyze new tracks automatically",
+      "Cooldown": "Suggestion cooldown (seconds)",
+      "MaxProposals": "Max proposals",
+      "Save": "Save"
+    },
+    "Notify": {
+      "Ready": "Agentic DJ is ready. Open it from the Playlists directory header."
+    }
+  }
+}

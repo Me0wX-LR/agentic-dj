@@ -1,0 +1,94 @@
+.agentic-dj .window-content {
+  padding: 0;
+}
+
+.agentic-dj-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.agentic-dj-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #555);
+}
+
+.agentic-dj-toolbar button {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.agentic-dj-toolbar button.active {
+  background: #3a6d4b;
+  color: #fff;
+}
+
+.agentic-dj-body {
+  overflow: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.agentic-dj-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.agentic-dj-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.agentic-dj-meta,
+.agentic-dj-plan {
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.agentic-dj-cue {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.6rem 0 0.2rem;
+}
+
+.agentic-dj-cue header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.agentic-dj-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.agentic-dj-tags span {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.agentic-dj-cue footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.agentic-dj-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+button.agentic-dj-open {
+  margin: 0.25rem;
+  width: calc(100% - 0.5rem);
+}

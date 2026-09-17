@@ -1,0 +1,55 @@
+<div class="agentic-dj-app">
+  <header class="agentic-dj-toolbar">
+    <button type="button" data-action="listen" class="{{#if listening}}active{{/if}}">
+      <i class="fa-solid fa-microphone"></i>
+      {{#if listening}}{{localize "AGENTICDJ.Listening"}}{{else}}{{localize "AGENTICDJ.Listen"}}{{/if}}
+    </button>
+    <button type="button" data-action="suggest"><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "AGENTICDJ.SuggestNow"}}</button>
+    <button type="button" data-action="analyze"><i class="fa-solid fa-tags"></i> {{localize "AGENTICDJ.AnalyzeLibrary"}}</button>
+    <button type="button" data-action="stop"><i class="fa-solid fa-stop"></i> {{localize "AGENTICDJ.StopMusic"}}</button>
+  </header>
+
+  <div class="agentic-dj-body">
+    <section class="agentic-dj-card">
+      <h3>{{localize "AGENTICDJ.Situation"}}</h3>
+      <p class="agentic-dj-meta">{{statusLabel}} · {{situation.sceneName}} · {{#if situation.inCombat}}Combat r{{situation.round}}{{else}}Exploration{{/if}}</p>
+      <p>{{transcript}}</p>
+      <p class="agentic-dj-meta">Now: {{playing}}</p>
+    </section>
+
+    <section class="agentic-dj-card">
+      <h3>{{localize "AGENTICDJ.Suggestions"}}</h3>
+      {{#if proposal.plan}}<p class="agentic-dj-plan">{{proposal.plan}}</p>{{/if}}
+      {{#unless hasCues}}
+        <p>{{localize "AGENTICDJ.NoSuggestions"}}</p>
+      {{/unless}}
+      {{#each proposal.cues as |cue|}}
+        <article class="agentic-dj-cue">
+          <header>
+            <strong>{{cue.name}}</strong>
+            <span>{{cue.mood}} · {{cue.intensity}}/5</span>
+          </header>
+          <p>{{cue.why}}</p>
+          <p class="agentic-dj-tags">{{#each cue.tags}}<span>{{this}}</span>{{/each}}</p>
+          <footer>
+            <button type="button" data-action="play" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Play"}}</button>
+            <button type="button" data-action="preview" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Preview"}}</button>
+            <button type="button" data-action="skip" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Skip"}}</button>
+            <button type="button" data-action="ban" data-sound-id="{{cue.soundId}}">{{localize "AGENTICDJ.Ban"}}</button>
+          </footer>
+        </article>
+      {{/each}}
+    </section>
+
+    <section class="agentic-dj-card agentic-dj-split">
+      <div>
+        <h3>{{localize "AGENTICDJ.Catalog"}}</h3>
+        <p>{{catalog.analyzed}} / {{catalog.total}} analyzed</p>
+      </div>
+      <div>
+        <h3>{{localize "AGENTICDJ.Memory"}}</h3>
+        <p>Played {{memory.recentIds.length}} · Skipped {{memory.skippedIds.length}} · Banned {{memory.bannedIds.length}}</p>
+      </div>
+    </section>
+  </div>
+</div>

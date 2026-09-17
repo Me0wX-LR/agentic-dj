@@ -1,0 +1,29 @@
+name: Release Foundry module zip
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack module
+        run: |
+          mkdir -p dist/agentic-dj
+          rsync -a --exclude dist --exclude .git --exclude node_modules --exclude .github ./ dist/agentic-dj/
+          cp module.json dist/module.json
+          cd dist
+          zip -r agentic-dj.zip agentic-dj
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/module.json
+            dist/agentic-dj.zip
+          generate_release_notes: true
