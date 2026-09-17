@@ -9,7 +9,7 @@ It does **not** auto-play. The Librarian tags your existing playlists from the a
 In Foundry: **Install Module** → **Manifest URL**
 
 ```
-https://github.com/Me0wX-LR/agentic-dj/releases/latest/download/module.json
+https://raw.githubusercontent.com/Me0wX-LR/agentic-dj/main/module.json
 ```
 
 Then enable **Agentic DJ** in the world. Open it from the **Playlists** directory header (headphones button) or the token scene controls.
