@@ -305,7 +305,18 @@
   gap: 0.75rem;
 }
 
+.agentic-dj-open-wrap {
+  display: flex;
+  flex: 0 0 auto;
+  padding: 0.2rem 0.35rem 0.1rem;
+}
+
 button.agentic-dj-open {
-  margin: 0.25rem;
-  width: calc(100% - 0.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0;
+  width: 100%;
+  white-space: nowrap;
 }

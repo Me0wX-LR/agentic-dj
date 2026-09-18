@@ -11,12 +11,13 @@ import {
 } from "./debug/log.js";
 import { catalogStats } from "./rag/catalog.js";
 import { publicLlmConfig, registerSettings } from "./settings.js";
-import { attachControls } from "./ui/controls.js";
+import { bindControls, registerControlHooks } from "./ui/controls.js";
 import { patchPlaylistSearch } from "./ui/playlist-search.js";
 import { AgenticDjApp } from "./ui/dj-app.js";
 
 Hooks.once("init", () => {
   registerSettings();
+  registerControlHooks();
   logInfo("module.init", { version: VERSION, moduleJson: game.modules.get(MODULE_ID)?.version });
 });
 
@@ -37,7 +38,7 @@ Hooks.once("ready", async () => {
   }
   const orchestrator = new Orchestrator();
   orchestrator.start();
-  attachControls(orchestrator);
+  bindControls(orchestrator);
   const api = {
     orchestrator,
     open: () => AgenticDjApp.open(orchestrator),
