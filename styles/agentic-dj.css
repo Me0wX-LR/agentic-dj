@@ -312,10 +312,10 @@
 
 .agentic-dj-open-wrap {
   display: flex;
-  flex: 1 0 100%;
+  flex: 0 0 auto;
   width: 100%;
   max-width: 100%;
-  padding: 0.2rem 0 0.05rem;
+  padding: 0.25rem 0.35rem 0.1rem;
   box-sizing: border-box;
 }
 
@@ -326,5 +326,6 @@ button.agentic-dj-open {
   gap: 0.35rem;
   margin: 0;
   width: 100%;
+  min-height: 2rem;
   white-space: nowrap;
 }

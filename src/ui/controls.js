@@ -5,6 +5,7 @@ import { AgenticDjApp } from "./dj-app.js";
 let orchestrator = null;
 let hooksRegistered = false;
 let injectedOnce = false;
+let observer = null;
 
 function safe(event, fn) {
   try {
@@ -67,15 +68,12 @@ function makeOpenButton() {
   return button;
 }
 
-function mountWrap(parent, button) {
-  let wrap = parent.querySelector(":scope > .agentic-dj-open-wrap");
-  if (!wrap) {
-    wrap = document.createElement("div");
-    wrap.className = "agentic-dj-open-wrap";
-    parent.append(wrap);
-  }
-  wrap.replaceChildren(button);
-  return wrap;
+function placeWrap(root, wrap) {
+  const header = root.querySelector(":scope > [data-application-part='header'], :scope > .directory-header, [data-application-part='header'], .directory-header");
+  const controls = root.querySelector(":scope > [data-application-part='controls'], [data-application-part='controls']");
+  if (header?.parentElement) header.after(wrap);
+  else if (controls) controls.prepend(wrap);
+  else root.prepend(wrap);
 }
 
 export function injectPlaylistButton(app, html) {
@@ -86,30 +84,55 @@ export function injectPlaylistButton(app, html) {
       logWarn("controls.playlist.missingRoot");
       return false;
     }
-    if (root.querySelector(".agentic-dj-open-wrap .agentic-dj-open")) {
-      const existing = root.querySelector(".agentic-dj-open");
-      if (existing) existing.querySelector("span")?.replaceChildren(buttonLabel());
-      return true;
+    for (const stray of [...root.querySelectorAll(".agentic-dj-open-wrap")]) {
+      const parent = stray.parentElement;
+      const clipped = parent?.matches?.("[data-application-part='header'], .directory-header");
+      if (clipped) stray.remove();
     }
-    const button = makeOpenButton();
-    const header = root.querySelector("[data-application-part='header'], .directory-header");
-    const controls = root.querySelector("[data-application-part='controls']");
-    if (header) mountWrap(header, button);
-    else if (controls) mountWrap(controls, button);
-    else {
-      const wrap = document.createElement("div");
+    let wrap = [...root.querySelectorAll(".agentic-dj-open-wrap")].find(node => {
+      const part = node.parentElement?.getAttribute?.("data-application-part");
+      return part !== "header";
+    });
+    if (!wrap) {
+      wrap = document.createElement("div");
       wrap.className = "agentic-dj-open-wrap";
-      wrap.append(button);
-      root.prepend(wrap);
+      wrap.append(makeOpenButton());
+      placeWrap(root, wrap);
+    } else if (!wrap.querySelector(".agentic-dj-open")) {
+      wrap.replaceChildren(makeOpenButton());
+    } else {
+      wrap.querySelector(".agentic-dj-open span")?.replaceChildren(buttonLabel());
     }
+    watchPlaylist(root);
     if (!injectedOnce) {
       injectedOnce = true;
       logInfo("controls.playlist.injected", {
-        header: Boolean(header),
-        controls: Boolean(controls)
+        parent: wrap.parentElement?.getAttribute?.("data-application-part") || wrap.parentElement?.className || wrap.parentElement?.tagName
       });
     }
     return true;
+  });
+}
+
+function watchPlaylist(root) {
+  if (observer || typeof MutationObserver !== "function") return;
+  observer = new MutationObserver(() => {
+    if (!root.isConnected) return;
+    if (!root.querySelector(".agentic-dj-open-wrap .agentic-dj-open")) injectPlaylistButton();
+  });
+  observer.observe(root, { childList: true, subtree: true });
+}
+
+function injectSettingsButton(app, html) {
+  safe("controls.settings.inject", () => {
+    if (game.user && !game.user.isGM) return;
+    const root = asElement(app?.element) || asElement(html);
+    if (!root || root.querySelector(".agentic-dj-open")) return;
+    const mount = root.querySelector("#settings-game, .settings-sidebar, [data-application-part='main'], [data-application-part='body']") || root;
+    const wrap = document.createElement("div");
+    wrap.className = "agentic-dj-open-wrap";
+    wrap.append(makeOpenButton());
+    mount.prepend(wrap);
   });
 }
 
@@ -162,6 +185,7 @@ export function registerControlHooks() {
   Hooks.on("changeSidebarTab", app => {
     if (isPlaylistDirectory(app)) injectPlaylistButton(typeof app === "string" ? ui?.playlists : app);
   });
+  Hooks.on("renderSettings", (app, html) => injectSettingsButton(app, html));
   Hooks.on("getSceneControlButtons", controls => safe("controls.scene", () => addSceneTool(controls)));
 }
 
@@ -172,6 +196,7 @@ export function bindControls(next) {
     requestAnimationFrame(() => injectPlaylistButton(ui.playlists));
   }
   setTimeout(() => injectPlaylistButton(ui.playlists), 250);
+  setTimeout(() => injectPlaylistButton(ui.playlists), 1000);
 }
 
 /** @deprecated use registerControlHooks + bindControls */

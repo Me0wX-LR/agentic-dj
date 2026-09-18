@@ -42,10 +42,14 @@ export class Orchestrator {
     });
     if (setting("autoAnalyze")) {
       const stats = catalogStats();
-      if (stats.pending > 8) {
+      if (!stats.total) {
+        logInfo("orchestrator.autoAnalyze.skipped", { reason: "no-tracks" });
+      } else if (stats.pending === 0) {
+        logInfo("orchestrator.autoAnalyze.skipped", { reason: "already-tagged", total: stats.total });
+      } else if (stats.pending > 8) {
         logInfo("orchestrator.autoAnalyze.skipped", { pending: stats.pending, reason: "use-manual-list" });
       } else {
-        this.analyzeLibrary().catch(err => logError("orchestrator.autoAnalyze.failed", { error: err }));
+        this.analyzeLibrary(false).catch(err => logError("orchestrator.autoAnalyze.failed", { error: err }));
       }
     }
   }
@@ -93,6 +97,8 @@ export class Orchestrator {
       this.status = "idle";
       if (!catalogSize) {
         ui.notifications.warn(game.i18n.localize("AGENTICDJ.NoTracks"));
+      } else if (!scanned) {
+        logInfo("orchestrator.analyze.noop", { catalogSize, reason: "nothing-pending" });
       } else if (!results.length) {
         const first = failures[0]?.error ? ` ${failures[0].error}` : "";
         ui.notifications.error(game.i18n.format("AGENTICDJ.AnalyzedNone", { scanned, error: first }));

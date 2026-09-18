@@ -143,7 +143,7 @@
       "KeysCleared": "已從這台電腦移除已存 API 金鑰。"
     },
     "Notify": {
-      "Ready": "Agentic DJ 已就緒。從 Playlists 音樂分頁開啟。",
+      "Ready": "Agentic DJ 已就緒。從 Playlists 音樂分頁（搜尋列下方）開啟。",
       "NotReady": "Agentic DJ 還在啟動。等一下再按一次。",
       "Failed": "Agentic DJ 啟動失敗：{error}"
     }
