@@ -35,6 +35,12 @@ export async function pauseAllMusic() {
   }
 }
 
+export async function stopAllMusic() {
+  for (const playlist of game.playlists?.playing ?? []) {
+    await playlist.stopAll();
+  }
+}
+
 export async function playIncludedSounds(soundIds = [], { shuffle = false } = {}) {
   const ids = [...new Set((soundIds || []).filter(Boolean))];
   if (!ids.length) throw new Error("No included tracks to play");

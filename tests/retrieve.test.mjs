@@ -302,6 +302,14 @@ Steel Clash
   assert.match(buildCatalogTemplate(catalog), /Warm Hearth/);
 });
 
+test("playlists helpers export stop, pause, and play", async () => {
+  const playlists = await import("../src/tools/playlists.js");
+  assert.equal(typeof playlists.stopAllMusic, "function");
+  assert.equal(typeof playlists.pauseAllMusic, "function");
+  assert.equal(typeof playlists.playSoundById, "function");
+  assert.equal(typeof playlists.previewSound, "function");
+});
+
 test("memory markdown lists likes and bans", async () => {
   const { renderMemoryMarkdown } = await import("../src/memory/markdown.js");
   const md = renderMemoryMarkdown({
