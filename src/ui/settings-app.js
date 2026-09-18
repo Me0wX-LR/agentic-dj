@@ -1,4 +1,5 @@
 import { DEFAULTS, LLM_PRESETS, MODULE_ID, STT_PRESETS, normalizeLlmBaseUrl } from "../constants.js";
+import { applyUiLanguage, UI_LANGUAGES } from "../i18n.js";
 import { logInfo } from "../debug/log.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -69,6 +70,11 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
       sttBaseUrl: game.settings.get(MODULE_ID, "sttBaseUrl") || "",
       sttModel: game.settings.get(MODULE_ID, "sttModel") || DEFAULTS.sttModel,
       extraInstructions: game.settings.get(MODULE_ID, "extraInstructions") ?? DEFAULTS.extraInstructions,
+      uiLanguage: game.settings.get(MODULE_ID, "uiLanguage") || DEFAULTS.uiLanguage,
+      uiLanguages: UI_LANGUAGES.map(row => ({
+        ...row,
+        selected: (game.settings.get(MODULE_ID, "uiLanguage") || DEFAULTS.uiLanguage) === row.id
+      })),
       llmTemperature: numericSetting("llmTemperature", DEFAULTS.llmTemperature),
       llmMaxTokens: numericSetting("llmMaxTokens", DEFAULTS.llmMaxTokens),
       llmTopP: numericSetting("llmTopP", DEFAULTS.llmTopP),
@@ -143,6 +149,8 @@ export class AgenticDjSettings extends HandlebarsApplicationMixin(ApplicationV2)
     await game.settings.set(MODULE_ID, "sttBaseUrl", readValue(root, "sttBaseUrl"));
     await game.settings.set(MODULE_ID, "sttModel", readValue(root, "sttModel") || DEFAULTS.sttModel);
     await game.settings.set(MODULE_ID, "extraInstructions", root.querySelector('[name="extraInstructions"]')?.value ?? "");
+    await game.settings.set(MODULE_ID, "uiLanguage", readValue(root, "uiLanguage") || DEFAULTS.uiLanguage);
+    await applyUiLanguage();
     const temperature = Number(readValue(root, "llmTemperature") || DEFAULTS.llmTemperature);
     const maxTokens = Number(readValue(root, "llmMaxTokens") || DEFAULTS.llmMaxTokens);
     const topP = Number(readValue(root, "llmTopP") || DEFAULTS.llmTopP);

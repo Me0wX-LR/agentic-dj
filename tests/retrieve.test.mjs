@@ -91,6 +91,44 @@ test("learned likes boost a track in that mood", () => {
   assert.ok(ranked.find(row => row.track.soundId === "c").score > scoreTrack(drone, situation, {}).score);
 });
 
+test("useWhen and CJK combat language rerank over exploration beds", async () => {
+  const { retrieveTracks, inferWantedMood } = await import("../src/rag/retrieve.js");
+  const { expandQuery } = await import("../src/rag/synonyms.js");
+  assert.ok(expandQuery("啲人死曬打緊交").includes("combat"));
+  const bed = {
+    soundId: "bed",
+    name: "Crossandra",
+    mood: "exploration",
+    intensity: 3,
+    tags: ["explore"],
+    useWhen: "Calm travel and quiet streets",
+    features: { energy: 0.12, tempo: 90 }
+  };
+  const fight = {
+    soundId: "fight",
+    name: "Blood Stain",
+    mood: "exploration",
+    intensity: 4,
+    tags: ["blood"],
+    useWhen: "Fights, chases, sudden violence",
+    features: { energy: 0.62, tempo: 140 }
+  };
+  assert.equal(inferWantedMood({ transcript: "啲人死曬打緊交" }), "combat");
+  const ranked = retrieveTracks([bed, fight], { transcript: "啲人死曬打緊交" }, {}, { limit: 2, mood: "exploration" });
+  assert.equal(ranked[0].track.soundId, "fight");
+});
+
+test("sound description index line is searchable", async () => {
+  const { mergeSoundDescription, searchBlob, documentMatchesSearch } = await import("../src/rag/sound-index.js");
+  const card = { mood: "horror", intensity: 3, tags: ["dread", "abyss"], useWhen: "Wrongness in the city" };
+  const desc = mergeSoundDescription("Custom GM note", card);
+  assert.match(desc, /\[Agentic DJ\]/);
+  assert.match(desc, /Custom GM note/);
+  assert.equal(mergeSoundDescription(desc, { ...card, mood: "combat" }).includes("Custom GM note"), true);
+  assert.equal(documentMatchesSearch(searchBlob(card), "horror dread"), true);
+  assert.equal(documentMatchesSearch(searchBlob(card), "tavern"), false);
+});
+
 test("cantonese death language infers combat not exploration", async () => {
   const { inferWantedMood, retrieveTracks } = await import("../src/rag/retrieve.js");
   assert.equal(inferWantedMood({ transcript: "餵點呀hello hello 死咗好多人" }), "combat");
@@ -222,6 +260,7 @@ test("shipped defaults match the documented DJ sampling", async () => {
   assert.equal(DEFAULTS.cooldown, 20);
   assert.equal(DEFAULTS.maxProposals, 3);
   assert.equal(DEFAULTS.autoAnalyze, true);
+  assert.equal(DEFAULTS.uiLanguage, "auto");
   assert.equal(DEFAULTS.llmProvider, "openrouter");
 });
 

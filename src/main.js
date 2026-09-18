@@ -1,5 +1,5 @@
 import { MODULE_ID, VERSION } from "./constants.js";
-import { reloadEnglishFile } from "./i18n.js";
+import { applyUiLanguage } from "./i18n.js";
 import { Orchestrator } from "./agents/orchestrator.js";
 import {
   copyLogDump,
@@ -12,6 +12,7 @@ import {
 import { catalogStats } from "./rag/catalog.js";
 import { publicLlmConfig, registerSettings } from "./settings.js";
 import { attachControls } from "./ui/controls.js";
+import { patchPlaylistSearch } from "./ui/playlist-search.js";
 import { AgenticDjApp } from "./ui/dj-app.js";
 
 Hooks.once("init", () => {
@@ -20,11 +21,16 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("i18nInit", () => {
-  void reloadEnglishFile();
+  void applyUiLanguage();
+});
+
+Hooks.once("setup", () => {
+  patchPlaylistSearch();
 });
 
 Hooks.once("ready", async () => {
-  await reloadEnglishFile();
+  await applyUiLanguage();
+  patchPlaylistSearch();
   if (!game.user.isGM) {
     logInfo("module.ready.skip", { reason: "not-gm" });
     return;

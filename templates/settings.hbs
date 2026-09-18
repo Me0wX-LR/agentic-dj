@@ -82,6 +82,15 @@
   <fieldset class="agentic-dj-fieldset">
     <legend>{{localize "AGENTICDJ.Settings.TableSection"}}</legend>
   <div class="form-group">
+    <label>{{localize "AGENTICDJ.Settings.UiLanguage"}}</label>
+    <select name="uiLanguage">
+      {{#each uiLanguages}}
+        <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+      {{/each}}
+    </select>
+    <p class="hint">{{localize "AGENTICDJ.Settings.UiLanguageHint"}}</p>
+  </div>
+  <div class="form-group">
     <label>{{localize "AGENTICDJ.Settings.ExtraInstructions"}}</label>
     <textarea name="extraInstructions" rows="3">{{extraInstructions}}</textarea>
     <p class="hint">{{localize "AGENTICDJ.Settings.ExtraInstructionsHint"}}</p>

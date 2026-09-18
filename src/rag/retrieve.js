@@ -1,7 +1,5 @@
-/**
- * Pure catalog retrieval used by the Director and by Node tests.
- * Foundry is not required.
- */
+import { expandQuery, tokenizeSearch } from "./synonyms.js";
+import { bm25Retrieve, rerankHits } from "./rerank.js";
 
 const COMBAT_MOODS = new Set(["combat", "epic", "tension"]);
 const CALM_MOODS = new Set(["ambient", "exploration", "social", "tavern", "travel", "sad"]);
@@ -18,10 +16,7 @@ const MOOD_RULES = [
 ];
 
 export function tokenize(text = "") {
-  const raw = String(text).toLowerCase();
-  const latin = raw.split(/[^a-z0-9]+/g).filter(token => token.length > 2);
-  const cjk = raw.match(/[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]{2,8}/g) || [];
-  return [...latin, ...cjk];
+  return tokenizeSearch(text);
 }
 
 export function situationTags(situation = {}) {
@@ -33,7 +28,7 @@ export function situationTags(situation = {}) {
   ];
   const mood = situation.wantedMood || situation.mood;
   if (mood) parts.push(mood);
-  return new Set(tokenize(parts.filter(Boolean).join(" ")));
+  return new Set(expandQuery(parts.filter(Boolean).join(" "), mood));
 }
 
 export function inferWantedMood(situation = {}) {
@@ -188,17 +183,27 @@ export function retrieveTracks(catalog, situation, memory, { limit = 8, mood, ta
     intensity: wantedIntensity,
     recentChat: [situation.recentChat, query, ...(tags ?? [])].filter(Boolean).join(" ")
   };
-  return [...catalog]
-    .map(track => ({ track, ...scoreTrack(track, extra, memory) }))
-    .filter(row => Number.isFinite(row.score))
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      const aHit = (memory.lastProposedIds ?? []).includes(a.track.soundId);
-      const bHit = (memory.lastProposedIds ?? []).includes(b.track.soundId);
-      if (aHit !== bHit) return aHit ? 1 : -1;
-      return String(a.track.name || "").localeCompare(String(b.track.name || ""));
-    })
-    .slice(0, limit);
+  const queryTokens = expandQuery(
+    [query, extra.transcript, extra.recentChat, extra.sceneName, wantedMood].filter(Boolean).join(" "),
+    wantedMood
+  );
+  const pool = [];
+  for (const track of catalog) {
+    const features = scoreTrack(track, extra, memory);
+    if (!Number.isFinite(features.score)) continue;
+    pool.push(track);
+  }
+  const hits = bm25Retrieve(pool, queryTokens, Math.max(32, Number(limit) * 4));
+  const usable = hits.some(row => row.bm25 > 0) ? hits : pool.map(track => ({ track, bm25: 0 }));
+  return rerankHits(usable, {
+    wantedMood,
+    intensity: wantedIntensity,
+    inCombat: situation.inCombat,
+    memory,
+    limit,
+    queryTokens,
+    featureScore: track => scoreTrack(track, extra, memory)
+  });
 }
 
 export function verifyCandidates(catalog, soundIds, situation, memory, intendedMood, intendedIntensity) {

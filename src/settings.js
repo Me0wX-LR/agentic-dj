@@ -34,6 +34,7 @@ export function registerSettings() {
   game.settings.register(MODULE_ID, "sttApiKey", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "sttApiKeyHint", { ...client, type: String, default: "" });
   game.settings.register(MODULE_ID, "extraInstructions", { ...world, type: String, default: DEFAULTS.extraInstructions });
+  game.settings.register(MODULE_ID, "uiLanguage", { ...client, type: String, default: DEFAULTS.uiLanguage });
   game.settings.register(MODULE_ID, "llmTemperature", { ...client, type: Number, default: DEFAULTS.llmTemperature });
   game.settings.register(MODULE_ID, "llmMaxTokens", { ...client, type: Number, default: DEFAULTS.llmMaxTokens });
   game.settings.register(MODULE_ID, "llmTopP", { ...client, type: Number, default: DEFAULTS.llmTopP });

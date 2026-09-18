@@ -181,7 +181,9 @@ Paste that dump when reviewing ChatAnywhere or “0 tracks” failures.
 
 ## Optional
 
-[Audio Tagger](https://foundryvtt.com/packages/audio-tagger) tags are merged if that module is enabled. Not required.
+[Audio Tagger](https://foundryvtt.com/packages/audio-tagger) tags are merged if that module is enabled. Agentic DJ also writes mood/tags/`use when` onto each sound’s description and search index, so the Playlists search bar can find `horror`, `combat`, `戰鬥`, etc. after **Save tags**.
+
+Interface language: English, 繁體中文, 简体中文, 日本語 (Configure → Interface language, or Auto to follow Foundry).
 
 ## Development
 
@@ -191,4 +193,4 @@ npm test
 
 ## License
 
-MIT
+MIT. Author: **Me0wX-LR (Meowleftandright)**.

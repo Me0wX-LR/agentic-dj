@@ -48,6 +48,9 @@
           <tr data-sound-id="{{row.soundId}}" data-name="{{row.name}}">
             <td><input type="checkbox" name="include" {{#if row.included}}checked{{/if}} /></td>
             <td>
+              <button type="button" class="agentic-dj-row-play" data-action="playRow" data-sound-id="{{row.soundId}}" title="{{../l.play}}">
+                <i class="fa-solid fa-play"></i>
+              </button>
               <strong>{{row.name}}</strong>
               <div class="agentic-dj-meta">{{row.playlistName}}</div>
             </td>
@@ -69,6 +72,20 @@
     {{#unless rows.length}}
       <p>{{localize "AGENTICDJ.NoTracks"}}</p>
     {{/unless}}
+    <p class="flexrow agentic-dj-json-actions">
+      <button type="button" data-action="playIncluded">
+        <i class="fa-solid fa-play"></i>
+        <span>{{l.play}}</span>
+      </button>
+      <button type="button" data-action="pausePlayback">
+        <i class="fa-solid fa-pause"></i>
+        <span>{{l.pause}}</span>
+      </button>
+      <button type="button" data-action="shuffleIncluded">
+        <i class="fa-solid fa-shuffle"></i>
+        <span>{{l.shuffle}}</span>
+      </button>
+    </p>
   </div>
 
   <footer class="form-footer agentic-dj-manual-footer">
@@ -89,7 +106,7 @@
       <span>{{l.saveLlm}}</span>
     </button>
     <button type="button" data-action="saveSuggest" {{#if busy}}disabled{{/if}}>
-      <i class="fa-solid fa-play"></i>
+      <i class="fa-solid fa-forward"></i>
       <span>{{l.saveSuggest}}</span>
     </button>
   </footer>

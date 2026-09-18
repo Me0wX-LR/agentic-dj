@@ -1,4 +1,5 @@
 import { logError, logInfo, logWarn } from "../debug/log.js";
+import { uiLanguageName } from "../i18n.js";
 import { llmConfig, publicLlmConfig } from "../settings.js";
 
 function headers(cfg) {
@@ -117,7 +118,10 @@ export function parseJsonContent(content) {
 
 export function extraSystem() {
   const extra = llmConfig().extraInstructions;
-  return extra ? `\nGM extra instructions:\n${extra}` : "";
+  const lang = uiLanguageName();
+  let text = `\nWrite cue "why" lines in ${lang}. Catalog search is BM25 + rerank; prefer useWhen/tags over a stale exploration mood.`;
+  if (extra) text += `\nGM extra instructions:\n${extra}`;
+  return text;
 }
 
 function combineSignals(timeout, extra) {

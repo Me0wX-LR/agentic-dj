@@ -4,6 +4,7 @@ import { listCatalog } from "../rag/catalog.js";
 import { catalogMoodCounts, inferWantedIntensity, inferWantedMood, resolveCatalogId, retrieveTracks, verifyCandidates } from "../rag/retrieve.js";
 import { hasLlmKey, setting } from "../settings.js";
 import { chatComplete, extraSystem, parseJsonContent } from "../tools/llm.js";
+import { uiLanguageName } from "../i18n.js";
 
 export class Director {
   constructor(memory) {
@@ -108,11 +109,12 @@ export class Director {
 The mood field is a weak heuristic. Read transcript, GM typed notes, and chat in ANY language (Cantonese, Mandarin, Japanese, English) and infer the real table mood yourself.
 Death, blood, and fighting (死、流血、打交) are combat/horror, never exploration beds.
 Use tools to search and verify the music catalog. Never invent soundIds.
-Search with the inferred mood AND a short query taken from the transcript. Do not blindly reuse mood=exploration.
+Search with a short query from the live scene (any language). The catalog is BM25-retrieved then reranked by useWhen, tags, and mood — trust useWhen over a stored exploration label.
+Do not blindly reuse mood=exploration.
 If the catalog is mostly one stored mood, ignore those labels and rank by energy, tempo, intensity, and name.
 Never propose the same three tracks twice in a row when alternatives exist.
 If recovering from a GM skip/ban, verify search_catalog hits — never the skipped/banned id.
-Finish by calling propose_cues with 2-3 options. Do not play audio.
+Finish by calling propose_cues with 2-3 options. Write each why in ${uiLanguageName()}. Do not play audio.
 Respect learned likes/avoids from memory.md.${extraSystem()}`
       },
       {

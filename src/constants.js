@@ -1,5 +1,5 @@
 export const MODULE_ID = "agentic-dj";
-export const VERSION = "0.1.12";
+export const VERSION = "0.1.13";
 export const FLAG_SCOPE = "agentic-dj";
 export const FLAG_CARD = "card";
 
@@ -18,6 +18,7 @@ export const DEFAULTS = {
   sttBaseUrl: "",
   sttModel: "whisper-1",
   extraInstructions: "",
+  uiLanguage: "auto",
   autoAnalyze: true,
   cooldown: 20,
   maxProposals: 3
@@ -113,7 +114,7 @@ export const DIRECTOR_TOOLS = [
     type: "function",
     function: {
       name: "search_catalog",
-      description: "Search the analyzed music catalog by mood, tags, intensity, and free-text query. Returns ranked track cards.",
+      description: "Search the music catalog with BM25 then rerank by use-when, tags, mood, and intensity. Query in any language. Returns ranked track cards.",
       parameters: {
         type: "object",
         properties: {

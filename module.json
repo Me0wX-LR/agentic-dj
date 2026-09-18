@@ -2,14 +2,14 @@
   "id": "agentic-dj",
   "title": "Agentic DJ",
   "description": "A GM-side multi-agent soundtrack director for Foundry VTT v14. It analyzes playlist audio locally, listens to scene/combat/chat plus an optional GM microphone, then suggests 2–3 fitting tracks for the GM to confirm before playback.",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "compatibility": {
     "minimum": "14",
     "verified": "14"
   },
   "authors": [
     {
-      "name": "AgentKevin2077",
+      "name": "Me0wX-LR (Meowleftandright)",
       "url": "https://github.com/Me0wX-LR"
     }
   ],
@@ -24,6 +24,21 @@
       "lang": "en",
       "name": "English",
       "path": "lang/en.json"
+    },
+    {
+      "lang": "zh-TW",
+      "name": "正體中文",
+      "path": "lang/zh-TW.json"
+    },
+    {
+      "lang": "zh-CN",
+      "name": "简体中文",
+      "path": "lang/zh-CN.json"
+    },
+    {
+      "lang": "ja",
+      "name": "日本語",
+      "path": "lang/ja.json"
     }
   ],
   "socket": false,

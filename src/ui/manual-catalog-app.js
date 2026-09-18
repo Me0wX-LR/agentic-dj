@@ -3,6 +3,7 @@ import { logInfo, logWarn } from "../debug/log.js";
 import { t } from "../i18n.js";
 import { listCatalog } from "../rag/catalog.js";
 import { parseTableDraft, serializeTableDraft, tableRowsFromCatalog, applyImportedTracks, exportCatalogJson } from "../rag/manual-catalog.js";
+import { pauseAllMusic, playIncludedSounds, playSoundById } from "../tools/playlists.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -23,6 +24,10 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
       fillAnalyzed: AgenticDjManualCatalog.onFillAnalyzed,
       applyJson: AgenticDjManualCatalog.onApplyJson,
       exportJson: AgenticDjManualCatalog.onExportJson,
+      playIncluded: AgenticDjManualCatalog.onPlayIncluded,
+      pausePlayback: AgenticDjManualCatalog.onPausePlayback,
+      shuffleIncluded: AgenticDjManualCatalog.onShuffleIncluded,
+      playRow: AgenticDjManualCatalog.onPlayRow,
       applyTags: AgenticDjManualCatalog.onSave,
       saveLlm: AgenticDjManualCatalog.onSaveLlm,
       saveSuggest: AgenticDjManualCatalog.onSaveSuggest
@@ -81,7 +86,10 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
         fillAnalyzed: t("AGENTICDJ.Manual.FillAnalyzed", "Reload catalog"),
         save: t("AGENTICDJ.Manual.Save", "Save tags"),
         saveLlm: t("AGENTICDJ.Manual.SaveLlm", "Fill blanks with LLM"),
-        saveSuggest: t("AGENTICDJ.Manual.ApplySuggest", "Save and suggest")
+        saveSuggest: t("AGENTICDJ.Manual.ApplySuggest", "Save and suggest"),
+        play: t("AGENTICDJ.Manual.Play", "Play"),
+        pause: t("AGENTICDJ.Manual.Pause", "Pause"),
+        shuffle: t("AGENTICDJ.Manual.Shuffle", "Shuffle")
       }
     };
   }
@@ -140,6 +148,58 @@ export class AgenticDjManualCatalog extends HandlebarsApplicationMixin(Applicati
     this._clickAbort?.abort();
     this._clickAbort = null;
     return super.close(options);
+  }
+
+  includedSoundIds() {
+    return this.readRowsFromDom().filter(row => row.included !== false).map(row => row.soundId).filter(Boolean);
+  }
+
+  static async onPlayIncluded() {
+    try {
+      const ids = this.includedSoundIds();
+      if (!ids.length) {
+        ui.notifications.warn(t("AGENTICDJ.Manual.NoIncluded", "Check at least one track to play."));
+        return;
+      }
+      const result = await playIncludedSounds(ids, { shuffle: false });
+      logInfo("manual.play", result);
+    } catch (err) {
+      ui.notifications.error(err.message);
+    }
+  }
+
+  static async onPausePlayback() {
+    try {
+      await pauseAllMusic();
+      logInfo("manual.pause");
+    } catch (err) {
+      ui.notifications.error(err.message);
+    }
+  }
+
+  static async onShuffleIncluded() {
+    try {
+      const ids = this.includedSoundIds();
+      if (!ids.length) {
+        ui.notifications.warn(t("AGENTICDJ.Manual.NoIncluded", "Check at least one track to play."));
+        return;
+      }
+      const result = await playIncludedSounds(ids, { shuffle: true });
+      logInfo("manual.shuffle", result);
+    } catch (err) {
+      ui.notifications.error(err.message);
+    }
+  }
+
+  static async onPlayRow(_event, target) {
+    const id = target?.dataset?.soundId || target?.closest?.("[data-sound-id]")?.dataset?.soundId;
+    if (!id) return;
+    try {
+      await playSoundById(id);
+      logInfo("manual.playRow", { soundId: id });
+    } catch (err) {
+      ui.notifications.error(err.message);
+    }
   }
 
   static onFillEmpty() {

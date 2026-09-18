@@ -1,5 +1,20 @@
 import { MODULE_ID } from "./constants.js";
 
+export const UI_LANGUAGES = [
+  { id: "auto", label: "Auto (Foundry)" },
+  { id: "en", label: "English" },
+  { id: "zh-TW", label: "繁體中文" },
+  { id: "zh-CN", label: "简体中文" },
+  { id: "ja", label: "日本語" }
+];
+
+const LANG_NAMES = {
+  en: "English",
+  "zh-TW": "Traditional Chinese",
+  "zh-CN": "Simplified Chinese",
+  ja: "Japanese"
+};
+
 /** English strings Foundry may not have loaded yet (stale lang cache / mixed module files). */
 const FALLBACK = {
   AGENTICDJ: {
@@ -29,6 +44,10 @@ const FALLBACK = {
       Save: "Save tags",
       SaveLlm: "Fill blanks with LLM",
       ApplySuggest: "Save and suggest",
+      Play: "Play",
+      Pause: "Pause",
+      Shuffle: "Shuffle",
+      NoIncluded: "Check at least one track to play.",
       Imported: "Imported tags for {count} playlist sounds.",
       Exported: "Downloaded JSON for {count} tracks.",
       NoneMatched: "None of {scanned} JSON tracks matched a playlist sound. Example: {sample}",
@@ -46,6 +65,24 @@ export function t(key, fallback = "") {
   return value;
 }
 
+export function resolveUiLanguage(pref) {
+  const wanted = pref
+    || (typeof game !== "undefined" ? game.settings?.get?.(MODULE_ID, "uiLanguage") : "")
+    || "auto";
+  if (wanted && wanted !== "auto") return wanted;
+  const lang = String(game?.i18n?.lang || "en").toLowerCase();
+  if (lang.startsWith("zh") && (lang.includes("tw") || lang.includes("hk") || lang.includes("hant") || lang.includes("cht"))) {
+    return "zh-TW";
+  }
+  if (lang.startsWith("zh") || lang === "cn" || lang === "chs") return "zh-CN";
+  if (lang.startsWith("ja") || lang === "jp") return "ja";
+  return "en";
+}
+
+export function uiLanguageName() {
+  return LANG_NAMES[resolveUiLanguage()] || "English";
+}
+
 export function hydrateTranslations() {
   try {
     foundry.utils.mergeObject(game.i18n.translations, FALLBACK, {
@@ -59,9 +96,10 @@ export function hydrateTranslations() {
   }
 }
 
-export async function reloadEnglishFile() {
+export async function applyUiLanguage(pref) {
+  const code = resolveUiLanguage(pref);
   try {
-    const data = await foundry.utils.fetchJsonWithTimeout(`modules/${MODULE_ID}/lang/en.json`);
+    const data = await foundry.utils.fetchJsonWithTimeout(`modules/${MODULE_ID}/lang/${code}.json`);
     if (data && typeof data === "object") {
       foundry.utils.mergeObject(game.i18n.translations, data, {
         inplace: true,
@@ -71,7 +109,24 @@ export async function reloadEnglishFile() {
       });
     }
   } catch {
-    // Forge or cached zip without a reachable lang file; FALLBACK still applies.
+    if (code !== "en") {
+      try {
+        const en = await foundry.utils.fetchJsonWithTimeout(`modules/${MODULE_ID}/lang/en.json`);
+        foundry.utils.mergeObject(game.i18n.translations, en, {
+          inplace: true,
+          insertKeys: true,
+          insertValues: true,
+          overwrite: true
+        });
+      } catch {
+        // FALLBACK still applies
+      }
+    }
   }
   hydrateTranslations();
+  return code;
+}
+
+export async function reloadEnglishFile() {
+  return applyUiLanguage();
 }
