@@ -45,11 +45,22 @@ export class AgenticDjApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   static open(orchestrator) {
-    if (!this._instance) this._instance = new AgenticDjApp(orchestrator);
-    this._instance.orchestrator = orchestrator;
-    orchestrator.bind(this._instance);
-    this._instance.render({ force: true });
-    return this._instance;
+    try {
+      if (!orchestrator) throw new Error(game.i18n.localize("AGENTICDJ.Notify.NotReady"));
+      if (!this._instance) this._instance = new AgenticDjApp(orchestrator);
+      this._instance.orchestrator = orchestrator;
+      orchestrator.bind(this._instance);
+      const rendered = this._instance.render({ force: true });
+      rendered?.catch?.(err => {
+        console.error(`${MODULE_ID} render failed`, err);
+        ui.notifications.error(err.message);
+      });
+      return this._instance;
+    } catch (err) {
+      console.error(`${MODULE_ID} open failed`, err);
+      ui.notifications?.error(err.message);
+      return null;
+    }
   }
 
   async _prepareContext(options) {

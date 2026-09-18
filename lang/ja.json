@@ -143,7 +143,9 @@
       "KeysCleared": "保存していた API キーをこのコンピュータから削除しました。"
     },
     "Notify": {
-      "Ready": "Agentic DJ の準備ができました。Playlists ディレクトリの見出しから開いてください。"
+      "Ready": "Agentic DJ の準備ができました。Playlists タブから開いてください。",
+      "NotReady": "Agentic DJ はまだ起動中です。少し待ってからもう一度開いてください。",
+      "Failed": "Agentic DJ の起動に失敗しました: {error}"
     }
   }
 }

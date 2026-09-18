@@ -13,26 +13,30 @@ export function patchPlaylistSearch() {
   const original = Directory.prototype._matchSearchEntries;
   Directory.prototype._matchSearchEntries = function (query, entryIds, folderIds, autoExpandIds, options = {}) {
     original.call(this, query, entryIds, folderIds, autoExpandIds, options);
-    const raw = document.querySelector('.directory[data-tab="playlists"] input[name="search"]')?.value
-      || document.querySelector('#playlists input[name="search"]')?.value
-      || query
-      || "";
-    const terms = String(raw).toLowerCase().split(/\s+/).filter(Boolean);
-    if (!terms.length) return;
-    const soundIds = options.soundIds ??= new Set();
-    for (const playlist of this.collection) {
-      let hit = false;
-      for (const sound of playlist.sounds) {
-        if (!soundMatchesTerms(playlist, sound, terms)) continue;
-        soundIds.add(sound.id);
-        hit = true;
+    try {
+      const raw = document.querySelector('.directory[data-tab="playlists"] input[name="search"]')?.value
+        || document.querySelector('#playlists input[name="search"]')?.value
+        || query
+        || "";
+      const terms = String(raw).toLowerCase().split(/\s+/).filter(Boolean);
+      if (!terms.length) return;
+      const soundIds = options.soundIds ??= new Set();
+      for (const playlist of this.collection) {
+        let hit = false;
+        for (const sound of playlist.sounds) {
+          if (!soundMatchesTerms(playlist, sound, terms)) continue;
+          soundIds.add(sound.id);
+          hit = true;
+        }
+        if (!hit) continue;
+        entryIds.add(playlist.id);
+        for (let folder = playlist.folder; folder; folder = folder.folder) {
+          folderIds.add(folder.id);
+          autoExpandIds?.add?.(folder.id);
+        }
       }
-      if (!hit) continue;
-      entryIds.add(playlist.id);
-      for (let folder = playlist.folder; folder; folder = folder.folder) {
-        folderIds.add(folder.id);
-        autoExpandIds?.add?.(folder.id);
-      }
+    } catch (err) {
+      console.warn("agentic-dj playlist search patch failed", err);
     }
   };
   Directory.prototype._agenticDjSearchPatched = true;

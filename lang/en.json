@@ -143,7 +143,9 @@
       "KeysCleared": "Saved API keys were removed from this computer."
     },
     "Notify": {
-      "Ready": "Agentic DJ is ready. Open it from the Playlists directory header."
+      "Ready": "Agentic DJ is ready. Open it from the Playlists tab.",
+      "NotReady": "Agentic DJ is still starting. Wait a second, then click again.",
+      "Failed": "Agentic DJ failed to start: {error}"
     }
   }
 }

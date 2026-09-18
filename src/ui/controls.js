@@ -1,17 +1,31 @@
 import { MODULE_ID } from "../constants.js";
-import { logInfo, logWarn } from "../debug/log.js";
+import { logError, logInfo, logWarn } from "../debug/log.js";
 import { AgenticDjApp } from "./dj-app.js";
 
 let orchestrator = null;
 let hooksRegistered = false;
+let injectedOnce = false;
 
-function openDj() {
-  const current = orchestrator || game.modules.get(MODULE_ID)?.api?.orchestrator;
-  if (!current) {
-    logWarn("controls.open.missing");
-    return;
+function safe(event, fn) {
+  try {
+    return fn();
+  } catch (err) {
+    logError(event, { error: err });
+    return false;
   }
-  AgenticDjApp.open(current);
+}
+
+export function openDj() {
+  return safe("controls.open", () => {
+    const current = orchestrator || game.modules.get(MODULE_ID)?.api?.orchestrator;
+    if (!current) {
+      logWarn("controls.open.missing");
+      ui.notifications?.warn(game.i18n.localize("AGENTICDJ.Notify.NotReady"));
+      return false;
+    }
+    AgenticDjApp.open(current);
+    return true;
+  });
 }
 
 function asElement(value) {
@@ -40,47 +54,99 @@ function buttonLabel() {
   return game.i18n?.localize?.("AGENTICDJ.Title") || "Agentic DJ";
 }
 
-function fillButton(button) {
+function makeOpenButton() {
+  const button = document.createElement("button");
   button.type = "button";
   button.className = "agentic-dj-open";
   button.innerHTML = `<i class="fa-solid fa-headphones"></i> <span>${buttonLabel()}</span>`;
-}
-
-export function injectPlaylistButton(app, html) {
-  if (game.user && !game.user.isGM) return false;
-  const root = playlistRoot(app, html);
-  if (!root) {
-    logWarn("controls.playlist.missingRoot");
-    return false;
-  }
-  let wrap = root.querySelector(".agentic-dj-open-wrap");
-  if (wrap) {
-    const button = wrap.querySelector(".agentic-dj-open");
-    if (button) fillButton(button);
-    return true;
-  }
-  wrap = document.createElement("div");
-  wrap.className = "agentic-dj-open-wrap";
-  const button = document.createElement("button");
-  fillButton(button);
   button.addEventListener("click", event => {
     event.preventDefault();
     event.stopPropagation();
     openDj();
   });
-  wrap.append(button);
-  const header = root.querySelector("[data-application-part='header'], .directory-header");
-  const directory = root.querySelector("[data-application-part='directory'], .directory-list, ol.directory-list");
-  if (header) header.after(wrap);
-  else if (directory) directory.before(wrap);
-  else root.prepend(wrap);
-  logInfo("controls.playlist.injected", { afterHeader: Boolean(header), beforeDirectory: !header && Boolean(directory) });
-  return true;
+  return button;
+}
+
+function mountWrap(parent, button) {
+  let wrap = parent.querySelector(":scope > .agentic-dj-open-wrap");
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.className = "agentic-dj-open-wrap";
+    parent.append(wrap);
+  }
+  wrap.replaceChildren(button);
+  return wrap;
+}
+
+export function injectPlaylistButton(app, html) {
+  return safe("controls.playlist.inject", () => {
+    if (game.user && !game.user.isGM) return false;
+    const root = playlistRoot(app, html);
+    if (!root) {
+      logWarn("controls.playlist.missingRoot");
+      return false;
+    }
+    if (root.querySelector(".agentic-dj-open-wrap .agentic-dj-open")) {
+      const existing = root.querySelector(".agentic-dj-open");
+      if (existing) existing.querySelector("span")?.replaceChildren(buttonLabel());
+      return true;
+    }
+    const button = makeOpenButton();
+    const header = root.querySelector("[data-application-part='header'], .directory-header");
+    const controls = root.querySelector("[data-application-part='controls']");
+    if (header) mountWrap(header, button);
+    else if (controls) mountWrap(controls, button);
+    else {
+      const wrap = document.createElement("div");
+      wrap.className = "agentic-dj-open-wrap";
+      wrap.append(button);
+      root.prepend(wrap);
+    }
+    if (!injectedOnce) {
+      injectedOnce = true;
+      logInfo("controls.playlist.injected", {
+        header: Boolean(header),
+        controls: Boolean(controls)
+      });
+    }
+    return true;
+  });
 }
 
 function isPlaylistDirectory(app) {
+  if (app === "playlists") return true;
   const id = app?.id || app?.tabName || app?.options?.id;
   return id === "playlists" || app?.constructor?.name === "PlaylistDirectory";
+}
+
+function addSceneTool(controls) {
+  if (!game.user?.isGM) return;
+  const tool = {
+    name: MODULE_ID,
+    title: game.i18n.localize("AGENTICDJ.ControlTitle"),
+    icon: "fa-solid fa-headphones",
+    button: true,
+    visible: true,
+    onChange: () => openDj(),
+    onClick: () => openDj()
+  };
+  if (Array.isArray(controls)) {
+    const token = controls.find(c => c.name === "token" || c.name === "tokens") ?? controls[0];
+    if (!token) return;
+    if (Array.isArray(token.tools)) {
+      if (!token.tools.some(entry => entry.name === MODULE_ID)) token.tools.push(tool);
+    } else if (token.tools && typeof token.tools === "object") {
+      token.tools[MODULE_ID] ??= tool;
+    }
+    return;
+  }
+  const group = controls?.tokens ?? controls?.token ?? controls?.controls?.tokens ?? controls?.controls?.token;
+  if (!group) return;
+  if (Array.isArray(group.tools)) {
+    if (!group.tools.some(entry => entry.name === MODULE_ID)) group.tools.push(tool);
+  } else if (group.tools && typeof group.tools === "object") {
+    group.tools[MODULE_ID] ??= tool;
+  }
 }
 
 export function registerControlHooks() {
@@ -94,41 +160,9 @@ export function registerControlHooks() {
     if (isPlaylistDirectory(app)) injectPlaylistButton(app, html);
   });
   Hooks.on("changeSidebarTab", app => {
-    if (isPlaylistDirectory(app)) injectPlaylistButton(app);
+    if (isPlaylistDirectory(app)) injectPlaylistButton(typeof app === "string" ? ui?.playlists : app);
   });
-  Hooks.on("getHeaderControlsPlaylistDirectory", (_app, controls) => {
-    if (!game.user?.isGM || !Array.isArray(controls)) return;
-    if (controls.some(row => row.action === "agenticDj")) return;
-    controls.unshift({
-      icon: "fa-solid fa-headphones",
-      label: buttonLabel(),
-      action: "agenticDj",
-      onClick: () => openDj()
-    });
-  });
-  Hooks.on("getSceneControlButtons", controls => {
-    if (!game.user?.isGM) return;
-    const tool = {
-      name: MODULE_ID,
-      title: game.i18n.localize("AGENTICDJ.ControlTitle"),
-      icon: "fa-solid fa-headphones",
-      button: true,
-      onChange: () => openDj(),
-      onClick: () => openDj()
-    };
-    if (Array.isArray(controls)) {
-      const token = controls.find(c => c.name === "token") ?? controls[0];
-      token?.tools?.push?.(tool);
-      return;
-    }
-    const group = controls.tokens ?? controls.token;
-    if (!group) return;
-    if (Array.isArray(group.tools)) {
-      if (!group.tools.some(entry => entry.name === MODULE_ID)) group.tools.push(tool);
-    } else if (group.tools && typeof group.tools === "object") {
-      group.tools[MODULE_ID] = tool;
-    }
-  });
+  Hooks.on("getSceneControlButtons", controls => safe("controls.scene", () => addSceneTool(controls)));
 }
 
 export function bindControls(next) {
