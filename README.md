@@ -4,11 +4,13 @@ A Foundry VTT **v14** GM-side multi-agent soundtrack director. It does **not** a
 
 ## Install
 
-Foundry → **Install Module** → Manifest URL:
+Foundry / The Forge → **Add-on Modules** → **Install Module** → Manifest URL:
 
 ```
-https://raw.githubusercontent.com/Me0wX-LR/agentic-dj/main/module.json
+https://github.com/Me0wX-LR/agentic-dj/releases/latest/download/module.json
 ```
+
+The zip folder must be named `agentic-dj`. Do not install the GitHub source archive (`agentic-dj-main`); Foundry will not list that package.
 
 Enable **Agentic DJ**, then open it from the Playlists directory header. Minimum core: **14**.
 
